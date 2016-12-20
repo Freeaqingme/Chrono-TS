@@ -47,9 +47,6 @@ func init() {
 	daemonCmd.AddCommand(
 		daemonStartCmd,
 	)
-
-	daemonStartCmd.Flags().StringVarP(&daemonOpts.ConfFile,
-		"config", "", "/etc/sladu/sladu.conf", "The Config File to load")
 }
 
 func runDaemon(_ *cobra.Command, args []string) error {

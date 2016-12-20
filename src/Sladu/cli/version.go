@@ -13,16 +13,30 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package server
+package cli
 
 import (
-	"Sladu/protocol/graphite"
+	"fmt"
+
+	"github.com/spf13/cobra"
 )
 
-type Config struct {
-	Graphite graphite.Config
-}
+var (
+	BuildTag  string
+	BuildTime string
+)
 
-func NewConfig() *Config {
-	return &Config{}
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print the version number of Sladu",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf(
+			"Sladu - Keeping time in series - %s\n\n"+
+				"%s\nCopyright (c) 2016-2017, Dolf Schimmel\n"+
+				"License: Apache License, Version 2.0\n\n"+
+				"Time of Build: %s\n\n",
+			BuildTag,
+			"https://github.com/Freeaqingme/Sladu",
+			BuildTime)
+	},
 }

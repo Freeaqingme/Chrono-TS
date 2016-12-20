@@ -16,11 +16,8 @@
 package server
 
 import (
+	"Sladu/protocol/graphite"
 	"Sladu/util/stop"
-	"log"
-	"net"
-	"strconv"
-	"time"
 )
 
 type Server struct {
@@ -37,67 +34,14 @@ func NewServer(config *Config, stopper *stop.Stopper) *Server {
 
 // TODO: Move all graphite stuff to its own Protocol package
 func (s *Server) Start() error {
-	laddr, err := net.ResolveTCPAddr("tcp", s.config.Graphite.Bind.String()+":"+strconv.Itoa(s.config.Graphite.Port))
-	if nil != err {
+	err := graphite.NewServer(&s.config.Graphite, s.stopper).Start()
+	if err != nil {
 		return err
 	}
-	listener, err := net.ListenTCP("tcp", laddr)
-	if nil != err {
-		return err
-	}
-	log.Printf("listening on %s", listener.Addr())
 
-	go s.Serve(listener)
 	return nil
 }
 
 func (s *Server) Stop() {
 	// TODO: Abort all operations
-}
-
-func (s *Server) Serve(listener *net.TCPListener) {
-	for {
-		select {
-		case <-s.stopper.ShouldStop():
-			log.Println("stopping listening on", listener.Addr())
-			listener.Close()
-			return
-		default:
-		}
-		listener.SetDeadline(time.Now().Add(1e9))
-		conn, err := listener.AcceptTCP()
-		if nil != err {
-			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
-				continue
-			}
-			log.Println(err)
-		}
-		log.Println(conn.RemoteAddr(), "connected")
-		go s.handleConn(conn)
-	}
-}
-
-func (s *Server) handleConn(conn *net.TCPConn) {
-	defer conn.Close()
-	for {
-		select {
-		case <-s.stopper.ShouldStop():
-			log.Println("disconnecting", conn.RemoteAddr())
-			return
-		default:
-		}
-		conn.SetDeadline(time.Now().Add(1e9))
-		buf := make([]byte, 4096)
-		if _, err := conn.Read(buf); nil != err {
-			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
-				continue
-			}
-			log.Println(err)
-			return
-		}
-		if _, err := conn.Write(buf); nil != err {
-			log.Println(err)
-			return
-		}
-	}
 }
