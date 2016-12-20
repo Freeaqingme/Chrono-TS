@@ -1,4 +1,4 @@
-// MonGoTS - Keeping Time in Series
+// Sladu - Keeping Time in Series
 //
 // Copyright 2016 Dolf Schimmel
 //
@@ -13,18 +13,27 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package server
+package main
 
-import "net"
+import (
+	"fmt"
+	"os"
 
-type Config struct {
-	Graphite struct {
-		Enable bool
-		Port   int
-		Bind   net.IP
+	"Sladu/cli"
+)
+
+// Set by linker flags
+var (
+	buildTag  string
+	buildTime string
+)
+
+func main() {
+	cli.BuildTag = buildTag
+	cli.BuildTime = buildTime
+
+	if err := cli.RootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
-}
-
-func NewConfig() *Config {
-	return &Config{}
 }

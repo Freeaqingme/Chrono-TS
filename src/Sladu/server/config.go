@@ -1,4 +1,4 @@
-// MonGoTS - Keeping Time in Series
+// Sladu - Keeping Time in Series
 //
 // Copyright 2016 Dolf Schimmel
 //
@@ -13,19 +13,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package stop
+package server
 
-type Stopper struct {
-	stopper chan struct{}
-}
+import "net"
 
-func NewStopper() *Stopper {
-	return &Stopper{}
-}
-
-func (s *Stopper) ShouldStop() <-chan struct{} {
-	if s == nil {
-		return nil
+type Config struct {
+	Graphite struct {
+		Enable bool
+		Port   int
+		Bind   net.IP
 	}
-	return s.stopper
+}
+
+func NewConfig() *Config {
+	return &Config{}
 }

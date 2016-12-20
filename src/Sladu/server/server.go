@@ -1,4 +1,4 @@
-// MonGoTS - Keeping Time in Series
+// Sladu - Keeping Time in Series
 //
 // Copyright 2016 Dolf Schimmel
 //
@@ -16,7 +16,7 @@
 package server
 
 import (
-	"MonGoTS/util/stop"
+	"Sladu/util/stop"
 	"log"
 	"net"
 	"strconv"

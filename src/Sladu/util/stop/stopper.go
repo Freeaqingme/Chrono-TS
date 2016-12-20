@@ -1,4 +1,4 @@
-// MonGoTS - Keeping Time in Series
+// Sladu - Keeping Time in Series
 //
 // Copyright 2016 Dolf Schimmel
 //
@@ -13,27 +13,19 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package main
+package stop
 
-import (
-	"fmt"
-	"os"
+type Stopper struct {
+	stopper chan struct{}
+}
 
-	"MonGoTS/cli"
-)
+func NewStopper() *Stopper {
+	return &Stopper{}
+}
 
-// Set by linker flags
-var (
-	buildTag  string
-	buildTime string
-)
-
-func main() {
-	cli.BuildTag = buildTag
-	cli.BuildTime = buildTime
-
-	if err := cli.RootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+func (s *Stopper) ShouldStop() <-chan struct{} {
+	if s == nil {
+		return nil
 	}
+	return s.stopper
 }

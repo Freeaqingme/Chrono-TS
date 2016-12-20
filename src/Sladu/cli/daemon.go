@@ -1,4 +1,4 @@
-// MonGoTS - Keeping Time in Series
+// Sladu - Keeping Time in Series
 //
 // Copyright 2016 Dolf Schimmel
 //
@@ -24,8 +24,8 @@ import (
 	"github.com/spf13/cobra"
 	gcfg "gopkg.in/gcfg.v1"
 
-	"MonGoTS/server"
-	"MonGoTS/util/stop"
+	"Sladu/server"
+	"Sladu/util/stop"
 	"fmt"
 )
 
@@ -49,7 +49,7 @@ func init() {
 	)
 
 	daemonStartCmd.Flags().StringVarP(&daemonOpts.ConfFile,
-		"config", "", "/etc/mongo-ts/mongo-ts.conf", "The Config File to load")
+		"config", "", "/etc/sladu/sladu.conf", "The Config File to load")
 }
 
 func runDaemon(_ *cobra.Command, args []string) error {
@@ -69,7 +69,7 @@ func runDaemon(_ *cobra.Command, args []string) error {
 	s := server.NewServer(config, stopper)
 
 	if err := s.Start(); err != nil {
-		return fmt.Errorf("MonGo-TS could not start: %s", err)
+		return fmt.Errorf("Sladu could not start: %s", err)
 	}
 
 	select {
