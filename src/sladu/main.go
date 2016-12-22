@@ -13,30 +13,27 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package cli
+package main
 
 import (
 	"fmt"
+	"os"
 
-	"github.com/spf13/cobra"
+	"sladu/cli"
 )
 
+// Set by linker flags
 var (
-	BuildTag  string
-	BuildTime string
+	buildTag  string
+	buildTime string
 )
 
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print the version number of Sladu",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf(
-			"Sladu - Keeping time in series - %s\n\n"+
-				"%s\nCopyright (c) 2016-2017, Dolf Schimmel\n"+
-				"License: Apache License, Version 2.0\n\n"+
-				"Time of Build: %s\n\n",
-			BuildTag,
-			"https://github.com/Freeaqingme/Sladu",
-			BuildTime)
-	},
+func main() {
+	cli.BuildTag = buildTag
+	cli.BuildTime = buildTime
+
+	if err := cli.RootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }

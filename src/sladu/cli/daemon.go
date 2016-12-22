@@ -24,9 +24,9 @@ import (
 	"github.com/spf13/cobra"
 	gcfg "gopkg.in/gcfg.v1"
 
-	"Sladu/server"
-	"Sladu/util/stop"
 	"fmt"
+	"sladu/server"
+	"sladu/util/stop"
 )
 
 var daemonCmd = &cobra.Command{
@@ -66,7 +66,7 @@ func runDaemon(_ *cobra.Command, args []string) error {
 	s := server.NewServer(config, stopper)
 
 	if err := s.Start(); err != nil {
-		return fmt.Errorf("Sladu could not start: %s", err)
+		return fmt.Errorf("sladu could not start: %s", err)
 	}
 
 	select {

@@ -13,25 +13,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package cli
+package server
 
 import (
-	"github.com/spf13/cobra"
+	"sladu/protocol/graphite"
 )
 
-var RootCmd = &cobra.Command{
-	Use:  "Sladu",
-	Long: `Sladu is a Time Series Database based on MongoDB`,
+type Config struct {
+	Graphite graphite.Config
 }
 
-func init() {
-	RootCmd.AddCommand(
-		daemonCmd,
-
-		versionCmd,
-	)
-
-	RootCmd.PersistentFlags().StringVarP(&daemonOpts.ConfFile,
-		"config", "", "/etc/sladu/sladu.conf", "The Config File to load")
-
+func NewConfig() *Config {
+	return &Config{}
 }

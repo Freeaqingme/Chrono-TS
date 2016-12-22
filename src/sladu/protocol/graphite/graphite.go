@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"time"
 
-	"Sladu/util/stop"
+	"sladu/util/stop"
 )
 
 type Config struct {

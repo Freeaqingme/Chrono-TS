@@ -16,8 +16,8 @@
 package server
 
 import (
-	"Sladu/protocol/graphite"
-	"Sladu/util/stop"
+	"sladu/protocol/graphite"
+	"sladu/util/stop"
 )
 
 type Server struct {
