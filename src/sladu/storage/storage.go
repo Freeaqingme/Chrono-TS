@@ -13,18 +13,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package server
+package storage
 
-import (
-	"sladu/protocol/graphite"
-	"sladu/storage/mongo"
-)
-
-type Config struct {
-	Graphite graphite.Config
-	Mongo    mongo.Config
-}
-
-func NewConfig() *Config {
-	return &Config{}
+type Metric interface {
 }

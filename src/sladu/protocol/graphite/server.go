@@ -16,11 +16,14 @@
 package graphite
 
 import (
+	"io"
 	"log"
 	"net"
 	"strconv"
 	"time"
 
+	"bufio"
+	"sladu/storage"
 	"sladu/util/stop"
 )
 
@@ -33,12 +36,14 @@ type Config struct {
 type Server struct {
 	config  *Config
 	stopper *stop.Stopper
+	storage chan storage.Metric
 }
 
 func NewServer(config *Config, stopper *stop.Stopper) *Server {
 	return &Server{
 		config:  config,
 		stopper: stopper,
+		storage: make(chan storage.Metric, 1024),
 	}
 }
 
@@ -73,33 +78,39 @@ func (s *Server) Serve(listener *net.TCPListener) {
 				continue
 			}
 			log.Println(err)
+			continue
 		}
-		log.Println(conn.RemoteAddr(), "connected")
+		//		log.Println(conn.RemoteAddr(), "connected")
 		go s.handleConn(conn)
 	}
 }
 
 func (s *Server) handleConn(conn *net.TCPConn) {
 	defer conn.Close()
+	reader := bufio.NewReader(conn)
+
 	for {
 		select {
 		case <-s.stopper.ShouldStop():
-			log.Println("disconnecting", conn.RemoteAddr())
+			log.Println("disconnecting because of application stop: ", conn.RemoteAddr())
 			return
 		default:
 		}
 		conn.SetDeadline(time.Now().Add(1e9))
-		buf := make([]byte, 4096)
-		if _, err := conn.Read(buf); nil != err {
-			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
-				continue
-			}
-			log.Println(err)
+		message, err := reader.ReadString('\n')
+		if err == io.EOF {
+			return
+		} else if err != nil {
+			log.Println(err.Error())
 			return
 		}
-		if _, err := conn.Write(buf); nil != err {
-			log.Println(err)
-			return
+
+		if err := s.processRawMetric(message); err != nil {
+			log.Println(err.Error())
 		}
 	}
+}
+
+func (s *Server) Metrics() <-chan storage.Metric {
+	return s.storage
 }

@@ -17,6 +17,7 @@ package server
 
 import (
 	"sladu/protocol/graphite"
+	"sladu/storage/mongo"
 	"sladu/util/stop"
 )
 
@@ -32,12 +33,15 @@ func NewServer(config *Config, stopper *stop.Stopper) *Server {
 	}
 }
 
-// TODO: Move all graphite stuff to its own Protocol package
 func (s *Server) Start() error {
-	err := graphite.NewServer(&s.config.Graphite, s.stopper).Start()
-	if err != nil {
+	graphite := graphite.NewServer(&s.config.Graphite, s.stopper)
+	if err := graphite.Start(); err != nil {
 		return err
 	}
+
+	storage := mongo.NewMongo(&s.config.Mongo, s.stopper)
+	storage.AddSource("graphite", graphite.Metrics())
+	storage.Start()
 
 	return nil
 }
