@@ -16,19 +16,27 @@
 package mongo
 
 import (
+	//"fmt"
 	"fmt"
+	"gopkg.in/mgo.v2"
 	"log"
 	"sladu/storage"
 	"sladu/util/stop"
+	"strconv"
 	"sync"
 	"time"
 )
 
+const SCHEMA_VERSION = 1
+const WORKERS = 16 // TODO: Make configurable
+const DATABASES = 8
+
 type Config struct{}
 
 type Mongo struct {
-	config  *Config
-	stopper *stop.Stopper
+	config   *Config
+	stopper  *stop.Stopper
+	cRegular []*mgo.Collection
 
 	sources map[string]<-chan storage.Metric
 }
@@ -49,14 +57,52 @@ func (m *Mongo) AddSource(name string, src <-chan storage.Metric) {
 }
 
 func (m *Mongo) Start() {
+	m.connect()
+
 	metrics := m.aggregateSources()
-	go m.run(metrics)
+
+	for i := 0; i < WORKERS; i++ {
+		go m.persistMetrics(metrics)
+	}
+
 	go m.monitorSourceSizes(metrics)
+
+	fmt.Println(mgo.GetStats())
+
+	// TODO defer session.Close()
 }
 
-func (m *Mongo) run(metrics <-chan storage.Metric) {
+func (m *Mongo) connect() {
+	m.cRegular = make([]*mgo.Collection, DATABASES)
+	for i := int64(0); i < DATABASES; i++ {
+		session, err := mgo.Dial("localohst,localhost") // Todo: Make configurable
+		if err != nil {
+			panic(err)
+		}
+
+		session.SetMode(mgo.Eventual, true) // Todo: Make configurable
+
+		m.cRegular[i] = session.DB("sladu_" + strconv.FormatInt(i, 10)).C("regular_v" + strconv.Itoa(SCHEMA_VERSION))
+	}
+
+	mgo.SetStats(true)
+	go func() {
+		for {
+			time.Sleep(10 * time.Second)
+			fmt.Println(mgo.GetStats())
+		}
+	}()
+
+}
+
+func (m *Mongo) getDbConnection(keyHash uint32) *mgo.Collection {
+	return m.cRegular[keyHash%DATABASES]
+}
+
+func (m *Mongo) persistMetrics(metrics <-chan storage.Metric) {
 	for metric := range metrics {
-		fmt.Println("Persisting", metric)
+		//fmt.Println("Persisting", metric)
+		m.persistMetric(metric)
 	}
 }
 
@@ -65,18 +111,33 @@ func (m *Mongo) monitorSourceSizes(metrics <-chan storage.Metric) {
 		log.Printf("Queue %s has %d items", name, len(metric))
 	}
 
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	for _ = range ticker.C {
 		displaySize("aggegrate", metrics)
+		if len(metrics) == cap(metrics) {
+			m.purgeQueuedMetrics(metrics)
+		}
+
 		for name, channel := range m.sources {
 			displaySize(name, channel)
 		}
 	}
 }
 
+func (m *Mongo) purgeQueuedMetrics(metrics <-chan storage.Metric) {
+	i := 0
+	for range metrics {
+		i++
+		if float64(len(metrics))*1.1 < float64(cap(metrics)) {
+			log.Printf("Discarded %d metrics", i)
+			return
+		}
+	}
+}
+
 func (m *Mongo) aggregateSources() <-chan storage.Metric {
 	var wg sync.WaitGroup
-	out := make(chan storage.Metric, 1024)
+	out := make(chan storage.Metric, 1048560)
 
 	output := func(c <-chan storage.Metric) {
 		for n := range c {

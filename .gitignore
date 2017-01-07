@@ -4,3 +4,4 @@ src/gopkg.in/*
 bin/*
 pkg/*
 !src/MonGoTS/*
+sladu.conf

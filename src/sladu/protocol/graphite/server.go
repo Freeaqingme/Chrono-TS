@@ -96,7 +96,7 @@ func (s *Server) handleConn(conn *net.TCPConn) {
 			return
 		default:
 		}
-		conn.SetDeadline(time.Now().Add(1e9))
+		conn.SetDeadline(time.Now().Add(1e12))
 		message, err := reader.ReadString('\n')
 		if err == io.EOF {
 			return

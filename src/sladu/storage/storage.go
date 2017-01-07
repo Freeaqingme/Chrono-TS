@@ -15,5 +15,10 @@
 // limitations under the License.
 package storage
 
+import "time"
+
 type Metric interface {
+	Key() string
+	Value() float64
+	Time() time.Time
 }

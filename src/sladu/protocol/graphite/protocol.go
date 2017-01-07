@@ -28,6 +28,18 @@ type metric struct {
 	ts    time.Time
 }
 
+func (m *metric) Key() string {
+	return m.key
+}
+
+func (m *metric) Value() float64 {
+	return m.value
+}
+
+func (m *metric) Time() time.Time {
+	return m.ts
+}
+
 func (s *Server) processRawMetric(line string) error {
 	m, err := s.parseLine(line)
 	if err != nil {
