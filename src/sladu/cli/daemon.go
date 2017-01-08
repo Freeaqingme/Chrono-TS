@@ -16,6 +16,7 @@
 package cli
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -24,7 +25,6 @@ import (
 	"github.com/spf13/cobra"
 	gcfg "gopkg.in/gcfg.v1"
 
-	"fmt"
 	"sladu/server"
 	"sladu/util/stop"
 )
@@ -55,7 +55,11 @@ func runDaemon(_ *cobra.Command, args []string) error {
 	config := server.NewConfig()
 	err := gcfg.ReadFileInto(config, daemonOpts.ConfFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("Could not parse configuration: %s", err.Error())
+	}
+
+	if err = config.Validate(); err != nil {
+		return fmt.Errorf("Could not parse configuration: %s", err.Error())
 	}
 
 	signalCh := make(chan os.Signal, 1)

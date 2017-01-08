@@ -17,7 +17,7 @@ package server
 
 import (
 	"sladu/protocol/graphite"
-	"sladu/storage/mongo"
+	"sladu/storage/redis"
 	"sladu/util/stop"
 )
 
@@ -39,7 +39,8 @@ func (s *Server) Start() error {
 		return err
 	}
 
-	storage := mongo.NewMongo(&s.config.Mongo, s.stopper)
+	//storage := mongo.NewMongo(&s.config.Mongo, s.stopper)
+	storage := redis.NewRedis(&s.config.Redis, s.stopper, s.config.Tier)
 	storage.AddSource("graphite", graphite.Metrics())
 	storage.Start()
 

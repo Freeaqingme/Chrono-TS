@@ -16,15 +16,31 @@
 package server
 
 import (
+	"fmt"
 	"sladu/protocol/graphite"
+	"sladu/server/tier"
 	"sladu/storage/mongo"
+	"sladu/storage/redis"
 )
 
 type Config struct {
 	Graphite graphite.Config
 	Mongo    mongo.Config
+	Redis    redis.Config
+
+	Tier map[string]*tier.Tier
 }
 
 func NewConfig() *Config {
 	return &Config{}
+}
+
+func (c *Config) Validate() error {
+	for k, v := range c.Tier {
+		if err := v.Validate(); err != nil {
+			return fmt.Errorf("Error parsing tier '%s': %s", k, err.Error())
+		}
+	}
+
+	return nil
 }
