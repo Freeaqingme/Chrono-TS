@@ -2,3 +2,21 @@
 enable = false
 bind   = 0.0.0.0
 port   = 2003
+
+[tier "seconds"]
+granularity = "PT1S"
+
+[tier "minutes"]
+granularity = "PT1M"
+
+[tier "days"]
+granularity = "P1D"
+ttl         = "P1Y"
+
+[tier-set "default"]
+order = 100
+match = ".*"
+
+tier  = seconds
+tier  = minutes
+tier  = days

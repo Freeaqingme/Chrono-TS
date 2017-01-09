@@ -17,17 +17,18 @@ package redis
 
 import (
 	"log"
+	"runtime"
 	"sync"
 	"time"
-
-	redis "gopkg.in/redis.v3"
 
 	"sladu/server/tier"
 	"sladu/storage"
 	"sladu/util/stop"
+
+	redis "gopkg.in/redis.v5"
 )
 
-const WORKERS = 16 // TODO: Make configurable
+const WORKERS = 48 // TODO: Make configurable
 
 type Metric interface {
 	Key() string
@@ -38,20 +39,19 @@ type Metric interface {
 type Config struct{}
 
 type Redis struct {
-	config  *Config
-	stopper *stop.Stopper
-	client  *redis.Client
-	tiers   map[string]*tier.Tier
+	config   *Config
+	stopper  *stop.Stopper
+	tierSets []*tier.TierSet
 
 	sources map[string]<-chan storage.Metric
 }
 
-func NewRedis(config *Config, stopper *stop.Stopper, tiers map[string]*tier.Tier) *Redis {
+func NewRedis(config *Config, stopper *stop.Stopper, tierSets []*tier.TierSet) *Redis {
 	return &Redis{
-		config:  config,
-		stopper: stopper,
-		tiers:   tiers,
-		sources: make(map[string]<-chan storage.Metric, 0),
+		config:   config,
+		stopper:  stopper,
+		tierSets: tierSets,
+		sources:  make(map[string]<-chan storage.Metric, 0),
 	}
 }
 
@@ -63,8 +63,6 @@ func (r *Redis) AddSource(name string, src <-chan storage.Metric) {
 }
 
 func (r *Redis) Start() {
-	r.connect()
-
 	metrics := r.aggregateSources()
 
 	for i := 0; i < WORKERS; i++ {
@@ -76,19 +74,12 @@ func (r *Redis) Start() {
 	// TODO defer session.Close()
 }
 
-func (r *Redis) connect() {
-	r.client = redis.NewClient(&redis.Options{
+func (r *Redis) getClient() *redis.Client {
+	return redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
-}
-
-func (r *Redis) persistMetrics(metrics <-chan storage.Metric) {
-	for metric := range metrics {
-		//fmt.Println("Persisting", metric)
-		r.persistMetric(metric)
-	}
 }
 
 func (r *Redis) monitorSourceSizes(metrics <-chan storage.Metric) {
@@ -98,6 +89,7 @@ func (r *Redis) monitorSourceSizes(metrics <-chan storage.Metric) {
 
 	ticker := time.NewTicker(1 * time.Second)
 	for _ = range ticker.C {
+		log.Printf("Number of goroutines %d", runtime.NumGoroutine())
 		displaySize("aggegrate", metrics)
 		if len(metrics) == cap(metrics) {
 			r.purgeQueuedMetrics(metrics)

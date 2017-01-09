@@ -17,6 +17,7 @@ package server
 
 import (
 	"fmt"
+
 	"sladu/protocol/graphite"
 	"sladu/server/tier"
 	"sladu/storage/mongo"
@@ -28,7 +29,9 @@ type Config struct {
 	Mongo    mongo.Config
 	Redis    redis.Config
 
-	Tier map[string]*tier.Tier
+	Tiers            map[string]*tier.Tier    `gcfg:"tier"`
+	UnorderedTierSet map[string]*tier.TierSet `gcfg:"tier-set"`
+	TierSets         []*tier.TierSet
 }
 
 func NewConfig() *Config {
@@ -36,11 +39,19 @@ func NewConfig() *Config {
 }
 
 func (c *Config) Validate() error {
-	for k, v := range c.Tier {
+	for k, v := range c.Tiers {
 		if err := v.Validate(); err != nil {
-			return fmt.Errorf("Error parsing tier '%s': %s", k, err.Error())
+			return fmt.Errorf("Error parsing Tier '%s': %s", k, err.Error())
 		}
 	}
+
+	for k, v := range c.UnorderedTierSet {
+		if err := v.Validate(c.Tiers); err != nil {
+			return fmt.Errorf("Error parsing Tier Set '%s': %s", k, err.Error())
+		}
+	}
+
+	c.TierSets = tier.GetOrderedTierSets(c.UnorderedTierSet)
 
 	return nil
 }

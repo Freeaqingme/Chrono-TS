@@ -39,8 +39,7 @@ func (s *Server) Start() error {
 		return err
 	}
 
-	//storage := mongo.NewMongo(&s.config.Mongo, s.stopper)
-	storage := redis.NewRedis(&s.config.Redis, s.stopper, s.config.Tier)
+	storage := redis.NewRedis(&s.config.Redis, s.stopper, s.config.TierSets)
 	storage.AddSource("graphite", graphite.Metrics())
 	storage.Start()
 
