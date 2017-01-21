@@ -35,7 +35,7 @@ const SCHEMA_VERSION = 1
 func (r *Redis) persistMetrics(metrics <-chan storage.Metric) {
 	ticker := time.NewTicker(1 * time.Second)
 
-	client := r.getClient()
+	client := r.getNewClient()
 	pipeline := client.Pipeline()
 	for metric := range metrics {
 		r.persistMetric(pipeline, metric)
@@ -53,6 +53,7 @@ func (r *Redis) persistMetric(pipeline *redis.Pipeline, metric storage.Metric) {
 	for _, v := range r.tierSets {
 		if v.Regex.MatchString(metric.Key()) {
 			tierSet = v
+			break
 		}
 	}
 
@@ -66,15 +67,21 @@ func (r *Redis) persistMetric(pipeline *redis.Pipeline, metric storage.Metric) {
 
 func (r *Redis) persistMetricInTier(client *redis.Pipeline, metric storage.Metric, t *sladuTier.Tier) {
 	granularity := int(t.Granularity().Seconds())
-	offset := (metric.Time().Unix() % (VALUES_PER_BUCKET * int64(t.Granularity().Seconds())))
-	bucket := metric.Time().Unix() - offset
-	timestamp := int(int(bucket) + int(float64(offset)/t.Granularity().Seconds()))
+	redisKey, bucket, timestamp := r.getBucketForMetric(metric.Key(), int64(granularity), metric.Time().Unix())
 
-	keyHash := murmur3.Sum32([]byte(metric.Key()))
-	bucketSkewed := bucket - int64(keyHash)>>16
-
-	redisKey := fmt.Sprintf("sladu-%d-{metric-%s}-%d-%d", SCHEMA_VERSION, metric.Key(), bucketSkewed, granularity)
 	client.ZIncrBy(redisKey, metric.Value(), strconv.Itoa(timestamp))
-	client.ZAdd(fmt.Sprintf("sladu-%d-gc-%d", SCHEMA_VERSION, granularity), redis.Z{(float64(bucket) + t.CollectOffset()), redisKey})
+	client.ZAdd(r.getGcKey(granularity), redis.Z{float64(bucket) + t.CollectOffset(), redisKey})
 	client.Expire(redisKey, t.Ttl())
+}
+
+func (r *Redis) getBucketForMetric(metricName string, granularity int64, unixTime int64) (string, int64, int) {
+	keyHash := int64(murmur3.Sum32([]byte(metricName)))
+
+	offset := int64(unixTime) % (VALUES_PER_BUCKET * granularity)
+	bucket := int64(unixTime) - offset + (keyHash >> 16 % (VALUES_PER_BUCKET * granularity))
+	offset = offset - (offset % granularity)
+	timestamp := int(int(unixTime) + int(float64(offset)))
+
+	redisKey := fmt.Sprintf("sladu-%d-{metric-%s}-%d-%d", SCHEMA_VERSION, metricName, bucket, granularity)
+	return redisKey, bucket, timestamp
 }
