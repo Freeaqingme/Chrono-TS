@@ -68,10 +68,11 @@ func (r *Redis) persistMetric(pipeline *redis.Pipeline, metric storage.Metric) {
 func (r *Redis) persistMetricInTier(client *redis.Pipeline, metric storage.Metric, t *sladuTier.Tier) {
 	granularity := int(t.Granularity().Seconds())
 	redisKey, bucket, timestamp := r.getBucketForMetric(metric.Key(), int64(granularity), metric.Time().Unix())
+	gcTime := float64(bucket) + t.CollectOffset()
 
 	client.ZIncrBy(redisKey, metric.Value(), strconv.Itoa(timestamp))
-	client.ZAdd(r.getGcKey(granularity), redis.Z{float64(bucket) + t.CollectOffset(), redisKey})
-	client.Expire(redisKey, t.Ttl())
+	client.ZAdd(r.getGcKey(granularity), redis.Z{gcTime, redisKey})
+	client.ExpireAt(redisKey, time.Unix(int64(gcTime+t.Ttl().Seconds()), 0))
 }
 
 func (r *Redis) getBucketForMetric(metricName string, granularity int64, unixTime int64) (string, int64, int) {

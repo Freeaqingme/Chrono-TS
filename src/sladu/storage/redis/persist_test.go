@@ -9,7 +9,7 @@ import (
 
 func TestPersistMetricInTier(t *testing.T) {
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
+		Addr: "127.0.0.1:6380",
 		DB:   2,
 	})
 	redisClient.FlushAll()
@@ -33,7 +33,7 @@ func TestPersistMetricInTier(t *testing.T) {
 	expected := []string{
 		"zincrby sladu-1-{metric-foo}-1485004709-2 3.14159 1485004876: 3.14159",
 		"zadd sladu-1-gc-2 1.485004995e+09 sladu-1-{metric-foo}-1485004709-2: 1",
-		"expire sladu-1-{metric-foo}-1485004709-2 300: true",
+		"expireat sladu-1-{metric-foo}-1485004709-2 1485005551: true",
 	}
 
 	for k, v := range cmds {
@@ -46,7 +46,7 @@ func TestPersistMetricInTier(t *testing.T) {
 
 func TestPersistMetricsInTier(t *testing.T) {
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
+		Addr: "127.0.0.1:6380",
 		DB:   2,
 	})
 	redisClient.FlushAll()
@@ -74,34 +74,34 @@ func TestPersistMetricsInTier(t *testing.T) {
 	expected := []string{
 		"zincrby sladu-1-{metric-foo}-1485004581-3 0 1485005004: 0",
 		"zadd sladu-1-gc-3 1.485004995e+09 sladu-1-{metric-foo}-1485004581-3: 1",
-		"expire sladu-1-{metric-foo}-1485004581-3 300: true",
+		"expireat sladu-1-{metric-foo}-1485004581-3 1485005679: true",
 		"zincrby sladu-1-{metric-foo}-1485004581-3 0.0032 1485005005: 0.0032",
 		"zadd sladu-1-gc-3 1.485004995e+09 sladu-1-{metric-foo}-1485004581-3: 0",
-		"expire sladu-1-{metric-foo}-1485004581-3 300: true",
+		"expireat sladu-1-{metric-foo}-1485004581-3 1485005679: true",
 		"zincrby sladu-1-{metric-foo}-1485004581-3 0.0064 1485005006: 0.0064",
 		"zadd sladu-1-gc-3 1.485004995e+09 sladu-1-{metric-foo}-1485004581-3: 0",
-		"expire sladu-1-{metric-foo}-1485004581-3 300: true",
+		"expireat sladu-1-{metric-foo}-1485004581-3 1485005679: true",
 		"zincrby sladu-1-{metric-foo}-1485004581-3 0.009600000000000001 1485005010: 0.009600000000000001",
 		"zadd sladu-1-gc-3 1.485004995e+09 sladu-1-{metric-foo}-1485004581-3: 0",
-		"expire sladu-1-{metric-foo}-1485004581-3 300: true",
+		"expireat sladu-1-{metric-foo}-1485004581-3 1485005679: true",
 		"zincrby sladu-1-{metric-foo}-1485004581-3 0.0128 1485005011: 0.0128",
 		"zadd sladu-1-gc-3 1.485004995e+09 sladu-1-{metric-foo}-1485004581-3: 0",
-		"expire sladu-1-{metric-foo}-1485004581-3 300: true",
+		"expireat sladu-1-{metric-foo}-1485004581-3 1485005679: true",
 		"zincrby sladu-1-{metric-foo}-1485004581-3 0.016 1485005012: 0.016",
 		"zadd sladu-1-gc-3 1.485004995e+09 sladu-1-{metric-foo}-1485004581-3: 0",
-		"expire sladu-1-{metric-foo}-1485004581-3 300: true",
+		"expireat sladu-1-{metric-foo}-1485004581-3 1485005679: true",
 		"zincrby sladu-1-{metric-foo}-1485004581-3 0.019200000000000002 1485005016: 0.019200000000000002",
 		"zadd sladu-1-gc-3 1.485004995e+09 sladu-1-{metric-foo}-1485004581-3: 0",
-		"expire sladu-1-{metric-foo}-1485004581-3 300: true",
+		"expireat sladu-1-{metric-foo}-1485004581-3 1485005679: true",
 		"zincrby sladu-1-{metric-foo}-1485004581-3 0.0224 1485005017: 0.0224",
 		"zadd sladu-1-gc-3 1.485004995e+09 sladu-1-{metric-foo}-1485004581-3: 0",
-		"expire sladu-1-{metric-foo}-1485004581-3 300: true",
+		"expireat sladu-1-{metric-foo}-1485004581-3 1485005679: true",
 		"zincrby sladu-1-{metric-foo}-1485004581-3 0.0256 1485005018: 0.0256",
 		"zadd sladu-1-gc-3 1.485004995e+09 sladu-1-{metric-foo}-1485004581-3: 0",
-		"expire sladu-1-{metric-foo}-1485004581-3 300: true",
+		"expireat sladu-1-{metric-foo}-1485004581-3 1485005679: true",
 		"zincrby sladu-1-{metric-foo}-1485004581-3 0.028800000000000003 1485005022: 0.028800000000000003",
 		"zadd sladu-1-gc-3 1.485004995e+09 sladu-1-{metric-foo}-1485004581-3: 0",
-		"expire sladu-1-{metric-foo}-1485004581-3 300: true",
+		"expireat sladu-1-{metric-foo}-1485004581-3 1485005679: true",
 	}
 
 	for k, v := range cmds {

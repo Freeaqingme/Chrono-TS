@@ -35,7 +35,7 @@ func (r *Redis) persistRollups() {
 				start := monotime.Now()
 				amount := r.rollupGranularity(client, granularity)
 				if amount > 0 {
-					log.Printf("Rolled up %d items with granularity %d in %s",
+					log.Printf("Rolled up %d items with granularity %ds in %s",
 						amount, granularity, monotime.Since(start))
 				}
 			}

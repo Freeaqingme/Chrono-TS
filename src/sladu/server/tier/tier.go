@@ -63,5 +63,6 @@ func (t *Tier) Validate() error {
 }
 
 func (t *Tier) calculateTtl() time.Duration {
-	return time.Duration(t.granularity.Seconds()*VALUES_PER_BUCKET) + (10 * COLLECT_OFFSET)
+	return time.Duration(int((10*COLLECT_OFFSET).Seconds())+
+		VALUES_PER_BUCKET*int(t.granularity.Seconds())) * time.Second
 }
