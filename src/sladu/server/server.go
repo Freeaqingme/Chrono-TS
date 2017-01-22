@@ -17,6 +17,8 @@ package server
 
 import (
 	"sladu/protocol/graphite"
+	"sladu/protocol/http"
+	"sladu/storage"
 	"sladu/storage/redis"
 	"sladu/util/stop"
 )
@@ -24,6 +26,8 @@ import (
 type Server struct {
 	config  *Config
 	stopper *stop.Stopper
+
+	repo *redis.Redis
 }
 
 func NewServer(config *Config, stopper *stop.Stopper) *Server {
@@ -39,11 +43,17 @@ func (s *Server) Start() error {
 		return err
 	}
 
-	storage := redis.NewRedis(&s.config.Redis, s.stopper, s.config.TierSets)
-	storage.AddSource("graphite", graphite.Metrics())
-	storage.Start()
+	s.repo = redis.NewRedis(&s.config.Redis, s.stopper, s.config.TierSets)
+	s.repo.AddSource("graphite", graphite.Metrics())
+	s.repo.Start()
+
+	http.Start(s.Repo())
 
 	return nil
+}
+
+func (s *Server) Repo() storage.Repo {
+	return s.repo
 }
 
 func (s *Server) Stop() {

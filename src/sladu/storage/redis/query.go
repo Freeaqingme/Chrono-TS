@@ -18,6 +18,7 @@ package redis
 import (
 	"strconv"
 
+	"fmt"
 	"gopkg.in/redis.v5"
 )
 
@@ -36,5 +37,30 @@ func (r *Redis) queryBucket(bucket string) (map[int]float64, error) {
 		out[timestamp] = v.Score
 	}
 
+	return out, nil
+}
+
+func (r *Redis) GetMetricNames() ([]string, error) {
+	keys := make(map[string]struct{})
+	client := r.getNewClient()
+
+	match := fmt.Sprintf("sladu-%d-{metric-*}-*", SCHEMA_VERSION)
+	iterator := client.Scan(0, match, 4096).Iterator()
+	for {
+		if !iterator.Next() {
+			break
+		}
+
+		metric, _, _, _ := r.getMetricNameFromRedisKey(iterator.Val())
+		keys[metric] = struct{}{}
+		if !iterator.Next() { // Skip over score
+			break
+		}
+	}
+
+	out := make([]string, 0, len(keys))
+	for key := range keys {
+		out = append(out, key)
+	}
 	return out, nil
 }

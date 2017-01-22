@@ -16,13 +16,13 @@
 package graphite
 
 import (
+	"bufio"
 	"io"
 	"log"
 	"net"
 	"strconv"
 	"time"
 
-	"bufio"
 	"sladu/storage"
 	"sladu/util/stop"
 )

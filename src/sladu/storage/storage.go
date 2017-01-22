@@ -22,3 +22,7 @@ type Metric interface {
 	Value() float64
 	Time() time.Time
 }
+
+type Repo interface {
+	GetMetricNames() (metricNames []string, err error)
+}
