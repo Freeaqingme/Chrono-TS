@@ -20,13 +20,11 @@ import (
 
 	"chronodium/protocol/graphite"
 	"chronodium/server/tier"
-	"chronodium/storage/mongo"
 	"chronodium/storage/redis"
 )
 
 type Config struct {
 	Graphite graphite.Config
-	Mongo    mongo.Config
 	Redis    redis.Config
 
 	Tiers            map[string]*tier.Tier    `gcfg:"tier"`

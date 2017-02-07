@@ -21,7 +21,7 @@ import (
 
 var RootCmd = &cobra.Command{
 	Use:  "chronodium",
-	Long: `chronodium is a Time Series Database based on MongoDB`,
+	Long: `Chronodium is a Time Series Database based on Redis`,
 }
 
 func init() {
