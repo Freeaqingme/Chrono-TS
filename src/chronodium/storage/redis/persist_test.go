@@ -1,8 +1,8 @@
 package redis
 
 import (
-	redis "gopkg.in/redis.v5"
 	chronodiumTier "chronodium/server/tier"
+	redis "gopkg.in/redis.v5"
 	"testing"
 	"time"
 )

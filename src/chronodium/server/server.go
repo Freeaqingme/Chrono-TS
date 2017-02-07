@@ -18,6 +18,7 @@ package server
 import (
 	"chronodium/protocol/graphite"
 	"chronodium/protocol/http"
+	"chronodium/protocol/influxdb"
 	"chronodium/storage"
 	"chronodium/storage/redis"
 	"chronodium/util/stop"
@@ -38,13 +39,24 @@ func NewServer(config *Config, stopper *stop.Stopper) *Server {
 }
 
 func (s *Server) Start() error {
-	graphite := graphite.NewServer(&s.config.Graphite, s.stopper)
-	if err := graphite.Start(); err != nil {
-		return err
+	s.repo = redis.NewRedis(&s.config.Redis, s.stopper, s.config.TierSets)
+
+	if s.config.Graphite.Enable {
+		graphite := graphite.NewServer(&s.config.Graphite, s.stopper)
+		if err := graphite.Start(); err != nil {
+			return err
+		}
+		s.repo.AddSource("graphite", graphite.Metrics())
 	}
 
-	s.repo = redis.NewRedis(&s.config.Redis, s.stopper, s.config.TierSets)
-	s.repo.AddSource("graphite", graphite.Metrics())
+	if s.config.Influxdb.Enable {
+		influxdb := influxdb.NewServer(&s.config.Influxdb, s.stopper)
+		if err := influxdb.Start(); err != nil {
+			return err
+		}
+
+		s.repo.AddSource("influxdb", influxdb.Metrics())
+	}
 	s.repo.Start()
 
 	http.Start(s.Repo())

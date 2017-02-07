@@ -19,12 +19,14 @@ import (
 	"fmt"
 
 	"chronodium/protocol/graphite"
+	"chronodium/protocol/influxdb"
 	"chronodium/server/tier"
 	"chronodium/storage/redis"
 )
 
 type Config struct {
 	Graphite graphite.Config
+	Influxdb influxdb.Config
 	Redis    redis.Config
 
 	Tiers            map[string]*tier.Tier    `gcfg:"tier"`

@@ -3,6 +3,11 @@ enable = false
 bind   = 0.0.0.0
 port   = 2003
 
+[influxdb]
+enable = true
+bind   = 127.1.1.2
+port   = 8087
+
 [tier "seconds"]
 granularity = "PT1S"
 

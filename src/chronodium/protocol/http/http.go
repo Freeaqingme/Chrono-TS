@@ -33,7 +33,7 @@ func Start(repo storage.Repo) {
 
 	http.HandleFunc("/metrics/index.json",
 		func(w http.ResponseWriter, r *http.Request) { s.handler(w, r) })
-	http.ListenAndServe(":8080", nil)
+	go http.ListenAndServe(":8080", nil)
 }
 
 func (s *httpServer) handler(w http.ResponseWriter, r *http.Request) {
