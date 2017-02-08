@@ -51,8 +51,9 @@ func (r *Redis) GetMetricNames() ([]string, error) {
 			break
 		}
 
-		metric, _, _, _ := r.getMetricNameFromRedisKey(iterator.Val())
-		keys[metric] = struct{}{}
+		// TODO
+		//metric, _, _, _ := r.getMetricNameFromRedisKey(iterator.Val())
+		//keys[metric] = struct{}{}
 		if !iterator.Next() { // Skip over score
 			break
 		}

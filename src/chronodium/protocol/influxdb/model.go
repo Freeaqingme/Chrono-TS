@@ -39,17 +39,17 @@ func (m *metric) Time() time.Time {
 // TODO: Move to lua
 func (m *metric) Key() string {
 	if m.key == "" {
-		if vhost, exists := m.Tags()["vhost"]; exists {
+		if vhost, exists := m.Metadata()["vhost"]; exists {
 			m.key = vhost + "__" + m.point.Name()
 		} else {
-			m.key = m.Tags()["host"] + "__" + m.point.Name()
+			m.key = m.Metadata()["host"] + "__" + m.point.Name()
 		}
 	}
 
 	return m.key
 }
 
-func (m *metric) Tags() map[string]string {
+func (m *metric) Metadata() map[string]string {
 	if m.tags == nil {
 		m.tags = make(map[string]string, len(m.point.Tags()))
 		for _, tag := range m.point.Tags() {
@@ -77,10 +77,12 @@ func getMetricsFromInfluxPoint(point models.Point) []*metric {
 				panic("Unsupported type in " + p.String())
 			}
 
-			metrics = append(metrics, &metric{
+			m := &metric{
 				point: p,
 				value: value,
-			})
+			}
+
+			metrics = append(metrics, m)
 		}
 	}
 

@@ -40,6 +40,10 @@ func (m *metric) Time() time.Time {
 	return m.ts
 }
 
+func (m *metric) Metadata() map[string]string {
+	return make(map[string]string, 0)
+}
+
 func (s *Server) processRawMetric(line string) error {
 	m, err := s.parseLine(line)
 	if err != nil {

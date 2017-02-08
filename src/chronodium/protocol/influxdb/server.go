@@ -16,6 +16,7 @@
 package influxdb
 
 import (
+	"bytes"
 	"net"
 	"net/http"
 	"strconv"
@@ -24,8 +25,6 @@ import (
 	"chronodium/storage"
 	"chronodium/util/stop"
 
-	"bytes"
-	"fmt"
 	"github.com/influxdata/influxdb/models"
 )
 
@@ -79,7 +78,7 @@ func (s *Server) writeHandler(w http.ResponseWriter, r *http.Request) {
 
 	for _, point := range points {
 		for _, m := range getMetricsFromInfluxPoint(point) {
-			//fmt.Println(m.Time(), m.Key(), m.Value(), m.Tags())
+			//fmt.Println(m.Time(), m.Key(), m.Value(), m.Metadata())
 			s.storage <- m
 		}
 

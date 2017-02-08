@@ -16,19 +16,17 @@
 package redis
 
 import (
-	"chronodium/storage"
+	"bytes"
 	"fmt"
-	"log"
-	"strconv"
+	"sort"
 	"time"
 
-	chronodiumTier "chronodium/server/tier"
+	"chronodium/storage"
+	"chronodium/util/conversion"
 
-	"github.com/spaolacci/murmur3"
+	"github.com/twmb/murmur3"
 	"gopkg.in/redis.v5"
 )
-
-const VALUES_PER_BUCKET = 128
 
 const SCHEMA_VERSION = 1
 
@@ -48,41 +46,46 @@ func (r *Redis) persistMetrics(metrics <-chan storage.Metric) {
 	}
 }
 
-func (r *Redis) persistMetric(pipeline *redis.Pipeline, metric storage.Metric) {
-	var tierSet *chronodiumTier.TierSet
-	for _, v := range r.tierSets {
-		if v.Regex.MatchString(metric.Key()) {
-			tierSet = v
-			break
+func (r *Redis) persistMetric(client *redis.Pipeline, metric storage.Metric) {
+	keyHash := int(murmur3.Sum32([]byte(metric.Key())))
+	bucket := int((metric.Time().Unix()-int64(keyHash>>16))/86400) * 86400
+
+	metadata := orderableMap(metric.Metadata()).ToJson()
+	metadataHash := murmur3.Sum32(metadata)
+
+	redisKey := fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw-%d", SCHEMA_VERSION, metric.Key(), 86400, bucket, metadataHash)
+
+	buf := make([]byte, 16)
+	conversion.Int64ToBinary(buf[0:8], metric.Time().UnixNano())
+	conversion.Float64ToBinary(buf[8:16], metric.Value())
+	client.Append(redisKey, string(buf))
+	client.Expire(redisKey, 24*time.Hour)
+
+	redisKey = fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw", SCHEMA_VERSION, metric.Key(), 86400, bucket)
+	client.ZAdd(redisKey, redis.Z{float64(metadataHash), metadata})
+	client.Expire(redisKey, 24*time.Hour)
+}
+
+type orderableMap map[string]string
+
+// See: http://stackoverflow.com/questions/25182923/go-golang-serialize-a-map-using-a-specific-order
+func (om orderableMap) ToJson() []byte {
+	var order []string
+	for k := range om {
+		order = append(order, k)
+	}
+	sort.Sort(sort.StringSlice(order))
+
+	buf := &bytes.Buffer{}
+	buf.Write([]byte{'{'})
+	l := len(order)
+	for i, k := range order {
+		// Lets assume for now k nor om[k] contain quotes or backslashes
+		fmt.Fprintf(buf, "\"%s\":\"%v\"", k, om[k])
+		if i < l-1 {
+			buf.WriteByte(',')
 		}
 	}
-
-	if tierSet == nil {
-		log.Printf("NOTICE: No Tier Set found for metric %s", metric.Key())
-		return
-	}
-
-	r.persistMetricInTier(pipeline, metric, tierSet.Tiers[0])
-}
-
-func (r *Redis) persistMetricInTier(client *redis.Pipeline, metric storage.Metric, t *chronodiumTier.Tier) {
-	granularity := int(t.Granularity().Seconds())
-	redisKey, bucket, timestamp := r.getBucketForMetric(metric.Key(), int64(granularity), metric.Time().Unix())
-	gcTime := float64(bucket) + t.CollectOffset()
-
-	client.ZIncrBy(redisKey, metric.Value(), strconv.Itoa(timestamp))
-	client.ZAdd(r.getGcKey(granularity), redis.Z{gcTime, redisKey})
-	client.ExpireAt(redisKey, time.Unix(int64(gcTime+t.Ttl().Seconds()), 0))
-}
-
-func (r *Redis) getBucketForMetric(metricName string, granularity int64, unixTime int64) (string, int64, int) {
-	keyHash := int64(murmur3.Sum32([]byte(metricName)))
-
-	offset := int64(unixTime) % (VALUES_PER_BUCKET * granularity)
-	bucket := int64(unixTime) - offset + (keyHash >> 16 % (VALUES_PER_BUCKET * granularity))
-	offset = offset - (offset % granularity)
-	timestamp := int(int(unixTime) + int(float64(offset)))
-
-	redisKey := fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d", SCHEMA_VERSION, metricName, bucket, granularity)
-	return redisKey, bucket, timestamp
+	buf.Write([]byte{'}'})
+	return buf.Bytes()
 }

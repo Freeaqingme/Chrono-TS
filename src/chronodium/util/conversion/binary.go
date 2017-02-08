@@ -13,17 +13,22 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package storage
+package conversion
 
-import "time"
+import "unsafe"
 
-type Metric interface {
-	Key() string
-	Value() float64
-	Time() time.Time
-	Metadata() map[string]string
+func Float64ToBinary(buf []byte, f float64) {
+	valptr := uintptr(unsafe.Pointer(&f))
+	for i := 0; i < 8; i++ {
+		buf[i] = byte(*(*byte)(unsafe.Pointer(valptr)))
+		valptr++
+	}
 }
 
-type Repo interface {
-	GetMetricNames() (metricNames []string, err error)
+func Int64ToBinary(buf []byte, v int64) {
+	valptr := uintptr(unsafe.Pointer(&v))
+	for i := 0; i < 8; i++ {
+		buf[i] = byte(*(*byte)(unsafe.Pointer(valptr)))
+		valptr++
+	}
 }

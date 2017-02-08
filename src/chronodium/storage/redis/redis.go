@@ -16,11 +16,8 @@
 package redis
 
 import (
-	"fmt"
 	"log"
-	"regexp"
 	"runtime"
-	"strconv"
 	"sync"
 	"time"
 
@@ -77,7 +74,6 @@ func (r *Redis) Start() {
 		go r.persistMetrics(metrics)
 	}
 
-	go r.persistRollups()
 	go r.monitorSourceSizes(metrics)
 }
 
@@ -139,47 +135,4 @@ func (r *Redis) aggregateSources() <-chan storage.Metric {
 		close(out)
 	}()
 	return out
-}
-
-func (r *Redis) getGcKey(granularity int) string {
-	return fmt.Sprintf("chronodium-%d-gc-%d", SCHEMA_VERSION, granularity)
-}
-
-func (r *Redis) getMetricNameFromRedisKey(key string) (metricName string, bucket, granularity int, error error) {
-	// TODO compile me once
-	regex := regexp.MustCompile("^chronodium-(?P<schemver>[0-9]+)-\\{metric-(?P<metric>.+)\\}-(?P<bucket>[0-9]{10})-(?P<granularity>[0-9]+)$")
-	match := regex.FindStringSubmatch(key)
-	if len(match) != 5 {
-		return metricName, bucket, granularity, fmt.Errorf("Regex returned %d elements", len(match))
-	}
-
-	schemVer, _ := strconv.Atoi(match[1])
-	if schemVer != SCHEMA_VERSION {
-		return metricName, bucket, granularity, fmt.Errorf("Unsupported schema version: %s", match[0])
-	}
-
-	metricName = match[2]
-	bucket, _ = strconv.Atoi(match[3])
-	granularity, _ = strconv.Atoi(match[4])
-	return
-}
-
-func (r *Redis) getNextTierForMetricAndGranularity(metricName string, granularity int) *tier.Tier {
-	for _, v := range r.tierSets {
-		if !v.Regex.MatchString(metricName) {
-			continue
-		}
-
-		for k, tier := range v.Tiers {
-			if int(tier.Granularity().Seconds()) != granularity {
-				continue
-			}
-			if len(v.Tiers)-1 <= k {
-				return nil
-			}
-			return v.Tiers[k+1]
-		}
-	}
-
-	return nil
 }
