@@ -40,7 +40,7 @@ func (r *Redis) Query(query *storage.Query) {
 	filter := map[string]string{
 		"host": "dolf-ThinkPad-T460s",
 	}
-	groupBy := []string{"instance", "type"}
+	groupBy := []string{"instance", "type", "host"}
 	//groupBy := []string{ "instance"}
 	if len(groupBy) > 1 {
 		log.Println("Grouping by more than one instance is flaky at best!")
@@ -50,13 +50,8 @@ func (r *Redis) Query(query *storage.Query) {
 	datapointGroups := make(map[int][]datapointGroup, 0)
 
 	buckets, _ := r.getBucketsInWindow(startTime, endTime, query.ShardKey)
-	fmt.Println(buckets)
-	//return
-
 	for _, bucket := range buckets {
 		groups := r.queryBucket(query.ShardKey, bucket, filter)
-		fmt.Println(bucket, groups)
-		//continue
 		for _, group := range groups {
 			var group2 datapointGroup
 			group2 = *group
@@ -67,24 +62,9 @@ func (r *Redis) Query(query *storage.Query) {
 			}
 		}
 	}
-	//fmt.Println("datapointGroups")
-	//for k , v := range datapointGroups {
-	//	fmt.Println(k, v[0].metadataHash, v[0].metadata)
-	//fmt.Println(k, v[1].metadataHash, v[1].metadata)
-	//}
-
-	//fmt.Println("Lenght:::::", len(datapointGroups))
 	grouped := newGroupByGroup(groupBy, datapointGroups)
-	//for _, groups := range datapointGroups {
-	//	fmt.Println(hash, groups[0].metadata)
-	//for _, group := range groups {
-	//	for _, point := range group.points{
-	//		fmt.Printf("%d, %.4f\n", point.timestamp, point.value, group.metadata)
-	//	}
-	//}
-	//}
 
-	fmt.Println("tree")
+	fmt.Println("Group By Tree, group by:", groupBy)
 	showTree(grouped, 0)
 
 }
@@ -124,26 +104,16 @@ func newGroupByGroup(groupBy []string, datapointGroups map[int][]datapointGroup)
 	for _, fieldName := range groupBy {
 		parentGroupByGroups := subGroupByGroups
 		fieldValues := make(map[string][]datapointGroup, 0)
+		for _, datapointGroupValues := range datapointGroups {
+			for _, group := range datapointGroupValues {
+				fieldValue := group.metadata[fieldName]
+				fieldValues[fieldValue] = append(fieldValues[fieldValue], group)
+			}
+		}
 
 		if subGroupByGroups == nil {
-			for _, datapointGroupValues := range datapointGroups {
-				//fmt.Println("116", datapointGroupValues) // , datapointGroupValues[0].metadata)
-				for _, group := range datapointGroupValues {
-
-					var group2 datapointGroup
-					group2 = group
-					fieldValue := (group2.metadata)[fieldName]
-					//fmt.Println("118", fieldValue, group.metadata)
-					if _, exists := fieldValues[fieldValue]; !exists {
-						fieldValues[fieldValue] = make([]datapointGroup, 0)
-					}
-					fieldValues[fieldValue] = append(fieldValues[fieldValue], group2)
-				}
-			}
-
 			subGroupByGroups = make([]groupByGroup, 0)
 			for fieldValue, datapointGroups := range fieldValues {
-				fmt.Println("fieldValue", fieldValue, datapointGroups[0].metadata)
 				subGroupByGroups = append(subGroupByGroups, groupByGroup{
 					fieldName:       fieldName,
 					fieldValue:      fieldValue,
@@ -152,23 +122,12 @@ func newGroupByGroup(groupBy []string, datapointGroups map[int][]datapointGroup)
 				})
 			}
 		} else {
-			fieldValues := make(map[string][]groupByGroup, 0)
-			for _, subGroup := range subGroupByGroups {
-				fieldValue := subGroup.metadata[fieldName]
-				if _, exists := fieldValues[fieldValue]; !exists {
-					fieldValues[fieldValue] = make([]groupByGroup, 0)
-				}
-				fmt.Println(fieldValue, subGroup.metadata)
-				fieldValues[fieldValue] = append(fieldValues[fieldValue], subGroup)
-			}
-
 			subGroupByGroups = make([]groupByGroup, 0)
-			for fieldValue, datapointGroups := range fieldValues {
+			for fieldValue, _ := range fieldValues {
 				subGroupByGroups = append(subGroupByGroups, groupByGroup{
 					fieldName:  fieldName,
 					fieldValue: fieldValue,
 					subGroupBy: parentGroupByGroups,
-					metadata:   datapointGroups[0].metadata,
 				})
 			}
 
@@ -182,9 +141,7 @@ func newGroupByGroup(groupBy []string, datapointGroups map[int][]datapointGroup)
 type groupByGroup struct {
 	fieldName  string
 	fieldValue string
-
-	metadata  	map[string]string // Get rid of me
-	metadataHashes []int
+	metadata   map[string]string
 
 	subGroupBy      []groupByGroup
 	datapointGroups []datapointGroup
