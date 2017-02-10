@@ -32,11 +32,25 @@ func Start(repo storage.Repo) {
 	}
 
 	http.HandleFunc("/metrics/index.json",
-		func(w http.ResponseWriter, r *http.Request) { s.handler(w, r) })
+		func(w http.ResponseWriter, r *http.Request) { s.graphiteHandler(w, r) })
+	http.HandleFunc("/chrono-ts/query",
+		func(w http.ResponseWriter, r *http.Request) { s.queryHandler(w, r) })
 	go http.ListenAndServe(":8080", nil)
 }
 
-func (s *httpServer) handler(w http.ResponseWriter, r *http.Request) {
+func (s *httpServer) queryHandler(w http.ResponseWriter, r *http.Request) {
+	query := &storage.Query{}
+	query.ShardKey = r.URL.Query().Get("pk")
+	if query.ShardKey == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("No primary key specified"))
+		return
+	}
+
+	s.repo.Query(query)
+}
+
+func (s *httpServer) graphiteHandler(w http.ResponseWriter, r *http.Request) {
 	metrics, _ := s.repo.GetMetricNames()
 
 	if jsonp := r.URL.Query().Get("jsonp"); jsonp != "" {

@@ -51,7 +51,8 @@ func (m *metric) Key() string {
 
 func (m *metric) Metadata() map[string]string {
 	if m.tags == nil {
-		m.tags = make(map[string]string, len(m.point.Tags()))
+		m.tags = make(map[string]string, len(m.point.Tags())+1)
+		m.tags["_key"] = m.point.Name()
 		for _, tag := range m.point.Tags() {
 			m.tags[string(tag.Key)] = string(tag.Value)
 		}

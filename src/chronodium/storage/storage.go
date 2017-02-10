@@ -26,4 +26,9 @@ type Metric interface {
 
 type Repo interface {
 	GetMetricNames() (metricNames []string, err error)
+	Query(*Query)
+}
+
+type Query struct {
+	ShardKey string
 }
