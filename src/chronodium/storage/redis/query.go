@@ -16,52 +16,142 @@
 package redis
 
 import (
-	"strconv"
+	"time"
 
+	"bytes"
+	"chronodium/storage"
+	"encoding/binary"
+	"encoding/json"
 	"fmt"
-	"gopkg.in/redis.v5"
+	"log"
 )
 
-var queryClient redis.Cmdable
+const (
+	AggrSum = iota
+)
 
-func (r *Redis) queryBucket(bucket string) (map[int]float64, error) {
-	out := make(map[int]float64, 0)
-
-	ret, err := r.client.ZRangeWithScores(bucket, 0, -1).Result()
-	if err != nil {
-		return out, err
+func (r *Redis) Query(query *storage.Query) {
+	startTime := time.Now().Add(-24 * time.Hour)
+	endTime := time.Now()
+	filter := map[string]string{
+		"host": "dolf-ThinkPad-T460s",
 	}
+	groupBy := []string{"instance", "type", "host"}
+	//groupBy = []string{ "instance"}
+	//fields := []string{"instance"}
+	//aggr := AggrSum
 
-	for _, v := range ret {
-		timestamp, _ := strconv.Atoi(v.Member.(string))
-		out[timestamp] = v.Score
+	datapointGroups := make(map[int][]datapointGroup, 0)
+
+	buckets, _ := r.getBucketsInWindow(startTime, endTime, query.ShardKey)
+	for _, bucket := range buckets {
+		groups := r.queryBucket(query.ShardKey, bucket, filter)
+		for _, group := range groups {
+			datapointGroups[group.metadataHash] = append(datapointGroups[group.metadataHash], *group)
+		}
 	}
+	grouped := newGroupByGroup(groupBy, datapointGroups)
 
-	return out, nil
+	fmt.Println("Group By Tree, group by:", groupBy)
+	showTree(grouped, 0)
+	fmt.Println("")
+	//keys := make(map[string]struct{},0)
+	//fields := make(map[string]string)
+	//renderTree(grouped, fields, keys, 0)
+	grouped.BuildResultSet()
+
 }
 
-func (r *Redis) GetMetricNames() ([]string, error) {
-	keys := make(map[string]struct{})
-	client := r.getNewClient()
+func (r *Redis) queryBucket(shardKey string, bucket int, filter map[string]string) []*datapointGroup {
+	out := make([]*datapointGroup, 0)
 
-	match := fmt.Sprintf("chronodium-%d-{metric-*}-*", SCHEMA_VERSION)
-	iterator := client.Scan(0, match, 4096).Iterator()
-	for {
-		if !iterator.Next() {
-			break
+	metadataHashes := r.getFilteredMetadataHashes(shardKey, bucket, filter)
+	for hash, metadata := range metadataHashes {
+		redisKey := fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw-%d", SCHEMA_VERSION, shardKey, 14400, bucket, hash)
+		rawPoints, err := r.client.Get(redisKey).Bytes()
+		if err != nil {
+			log.Println("Error from Redis: ", err.Error())
+			return out
 		}
 
-		// TODO
-		//metric, _, _, _ := r.getMetricNameFromRedisKey(iterator.Val())
-		//keys[metric] = struct{}{}
-		if !iterator.Next() { // Skip over score
-			break
-		}
+		out = append(out, &datapointGroup{r.unpackPoints(rawPoints), metadata, hash})
 	}
 
-	out := make([]string, 0, len(keys))
-	for key := range keys {
-		out = append(out, key)
+	return out
+}
+
+func (r *Redis) unpackPoints(rawPoints []byte) []*datapoint {
+	out := make([]*datapoint, 0, len(rawPoints)/16)
+	buf := bytes.NewBuffer(rawPoints)
+
+	var timestamp int64
+	var value float64
+
+	length := len(rawPoints)
+	for i := 0; i < length; i = i + 16 {
+		binary.Read(buf, binary.LittleEndian, &timestamp)
+		binary.Read(buf, binary.LittleEndian, &value)
+
+		out = append(out, &datapoint{timestamp, value})
 	}
-	return out, nil
+
+	return out
+}
+
+func (r *Redis) getFilteredMetadataHashes(shardKey string, bucket int, filter map[string]string) map[int]map[string]string {
+	redisKey := fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw", SCHEMA_VERSION, shardKey, 14400, bucket)
+	res, _ := r.client.ZRangeWithScores(redisKey, 0, -1).Result()
+
+	metadataHashes := make(map[int]map[string]string, 0)
+RowLoop:
+	for _, z := range res {
+		hash := int(z.Score)
+
+		metadata := make(map[string]string, 0)
+		err := json.Unmarshal([]byte(z.Member.(string)), &metadata)
+		if err != nil {
+			log.Println("Error unmarshalling json: ", err.Error())
+			continue
+		}
+
+		for k, v := range filter {
+			if metadataValue, ok := metadata[k]; !ok || metadataValue != v {
+				continue RowLoop
+			}
+		}
+
+		metadataHashes[hash] = metadata
+	}
+
+	return metadataHashes
+}
+
+func (r *Redis) getBucketsInWindow(startTime, endTime time.Time, shardKey string) ([]int, error) {
+	buckets := make([]int, 0)
+
+	if startTime.After(endTime) {
+		return buckets, fmt.Errorf("Start time must be smaller than or equal to end time")
+	}
+
+	for !startTime.After(endTime) {
+		buckets = append(buckets, r.getBucket(shardKey, &startTime))
+		startTime = startTime.Add(14400 * time.Second)
+	}
+
+	return buckets, nil
+}
+
+func (r *Redis) GetMetricNames() (metricNames []string, err error) {
+	return []string{}, nil
+}
+
+type datapoint struct {
+	timestamp int64
+	value     float64
+}
+
+type datapointGroup struct {
+	points       []*datapoint
+	metadata     map[string]string
+	metadataHash int
 }
