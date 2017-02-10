@@ -23,12 +23,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"gopkg.in/redis.v5"
 	"log"
-	"strings"
 )
-
-var queryClient redis.Cmdable
 
 const (
 	AggrSum = iota
@@ -41,10 +37,8 @@ func (r *Redis) Query(query *storage.Query) {
 		"host": "dolf-ThinkPad-T460s",
 	}
 	groupBy := []string{"instance", "type", "host"}
-	//groupBy := []string{ "instance"}
-	if len(groupBy) > 1 {
-		log.Println("Grouping by more than one instance is flaky at best!")
-	}
+	//groupBy = []string{ "instance"}
+	//fields := []string{"instance"}
 	//aggr := AggrSum
 
 	datapointGroups := make(map[int][]datapointGroup, 0)
@@ -53,98 +47,19 @@ func (r *Redis) Query(query *storage.Query) {
 	for _, bucket := range buckets {
 		groups := r.queryBucket(query.ShardKey, bucket, filter)
 		for _, group := range groups {
-			var group2 datapointGroup
-			group2 = *group
-			if _, exists := datapointGroups[group2.metadataHash]; exists {
-				datapointGroups[group2.metadataHash] = append(datapointGroups[group2.metadataHash], *group)
-			} else {
-				datapointGroups[group2.metadataHash] = []datapointGroup{group2}
-			}
+			datapointGroups[group.metadataHash] = append(datapointGroups[group.metadataHash], *group)
 		}
 	}
 	grouped := newGroupByGroup(groupBy, datapointGroups)
 
 	fmt.Println("Group By Tree, group by:", groupBy)
 	showTree(grouped, 0)
+	fmt.Println("")
+	//keys := make(map[string]struct{},0)
+	//fields := make(map[string]string)
+	//renderTree(grouped, fields, keys, 0)
+	grouped.BuildResultSet()
 
-}
-
-func showTree(group groupByGroup, depth int) {
-	fmt.Println(depth, strings.Repeat("    ", depth), group.fieldName, "\t", group.fieldValue, "\t", len(group.subGroupBy), group.metadata)
-	if group.subGroupBy == nil {
-		//for _,pointgroup := range group.datapointGroups {
-		//fmt.Println(pointgroup.metadata)
-		//}
-		return
-	}
-
-	for _, subgroup := range group.subGroupBy {
-		showTree(subgroup, depth+1)
-	}
-}
-
-func newGroupByGroup(groupBy []string, datapointGroups map[int][]datapointGroup) groupByGroup {
-	root := groupByGroup{
-		fieldName:       "__root",
-		fieldValue:      "__root",
-		subGroupBy:      make([]groupByGroup, 0),
-		datapointGroups: make([]datapointGroup, 0),
-	}
-
-	if len(groupBy) == 0 {
-		for _, groups := range datapointGroups {
-			for _, group := range groups {
-				root.datapointGroups = append(root.datapointGroups, group)
-			}
-		}
-		return root
-	}
-
-	var subGroupByGroups []groupByGroup
-	for _, fieldName := range groupBy {
-		parentGroupByGroups := subGroupByGroups
-		fieldValues := make(map[string][]datapointGroup, 0)
-		for _, datapointGroupValues := range datapointGroups {
-			for _, group := range datapointGroupValues {
-				fieldValue := group.metadata[fieldName]
-				fieldValues[fieldValue] = append(fieldValues[fieldValue], group)
-			}
-		}
-
-		if subGroupByGroups == nil {
-			subGroupByGroups = make([]groupByGroup, 0)
-			for fieldValue, datapointGroups := range fieldValues {
-				subGroupByGroups = append(subGroupByGroups, groupByGroup{
-					fieldName:       fieldName,
-					fieldValue:      fieldValue,
-					datapointGroups: datapointGroups,
-					metadata:        datapointGroups[0].metadata,
-				})
-			}
-		} else {
-			subGroupByGroups = make([]groupByGroup, 0)
-			for fieldValue, _ := range fieldValues {
-				subGroupByGroups = append(subGroupByGroups, groupByGroup{
-					fieldName:  fieldName,
-					fieldValue: fieldValue,
-					subGroupBy: parentGroupByGroups,
-				})
-			}
-
-		}
-	}
-
-	root.subGroupBy = subGroupByGroups
-	return root
-}
-
-type groupByGroup struct {
-	fieldName  string
-	fieldValue string
-	metadata   map[string]string
-
-	subGroupBy      []groupByGroup
-	datapointGroups []datapointGroup
 }
 
 func (r *Redis) queryBucket(shardKey string, bucket int, filter map[string]string) []*datapointGroup {
