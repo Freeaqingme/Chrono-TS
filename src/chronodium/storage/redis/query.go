@@ -16,14 +16,14 @@
 package redis
 
 import (
-	"time"
-
 	"bytes"
-	"chronodium/storage"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
+
+	"chronodium/storage"
 )
 
 const (
@@ -36,9 +36,13 @@ func (r *Redis) Query(query *storage.Query) {
 	filter := map[string]string{
 		"host": "dolf-ThinkPad-T460s",
 	}
-	groupBy := []string{"instance", "type", "host"}
-	//groupBy = []string{ "instance"}
-	//fields := []string{"instance"}
+	//groupBy := []string{"__time_300", "instance", "type", "host"}
+	timeGrouper := newGroupByTime(300 * time.Second)
+	groupBy := []grouper{timeGrouper, newGroupByStringer("instance"),
+		newGroupByStringer("type"), newGroupByStringer("host")}
+	//groupBy = []string{ "type"}
+	renderKeys := []string{timeGrouper.Key(), "host", "type", "instance"}
+	//renderKeys := []string{"type", "instance"}
 	//aggr := AggrSum
 
 	datapointGroups := make(map[int][]datapointGroup, 0)
@@ -57,8 +61,8 @@ func (r *Redis) Query(query *storage.Query) {
 	fmt.Println("")
 	//keys := make(map[string]struct{},0)
 	//fields := make(map[string]string)
-	//renderTree(grouped, fields, keys, 0)
-	grouped.BuildResultSet()
+	//buildResultSet(grouped, fields, keys, 0)
+	grouped.BuildResultSet(renderKeys, groupBy)
 
 }
 
