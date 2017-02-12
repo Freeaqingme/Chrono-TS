@@ -21,11 +21,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"chronodium/storage"
-	"sort"
-	"strconv"
 )
 
 const (
@@ -33,72 +34,32 @@ const (
 )
 
 func (r *Redis) Query(query *storage.Query) storage.ResultSet {
-	//startTime := time.Now().Add(-24 * time.Hour)
-	//endTime := time.Now()
-	/*	filter := map[string]string{
-		"host": "dolf-ThinkPad-T460s",
-		//"instance": "enp0s31f6",
-		//"type": "if_octets",
-	}*/
-
-	datapointGroups := make(map[int][]datapointGroup, 0)
-
 	buckets, _ := r.getBucketsInWindow(*query.GetStartDate(), *query.GetEndDate(), query.ShardKey)
+	out := make(ResultSet, 0)
 	for _, bucket := range buckets {
-		groups := r.queryBucket(query.ShardKey, bucket, query.Filter)
-		for _, group := range groups {
-			datapointGroups[group.metadataHash] = append(datapointGroups[group.metadataHash], *group)
-		}
+		out = append(out, r.queryBucket(query.ShardKey, bucket, query.Filter)...)
 	}
 
-	out := make(ResultSet, 0)
-	for _, dpgs := range datapointGroups {
-		for _, dpg := range dpgs {
-			for _, point := range dpg.points {
-				//entry["_value"] = strconv.FormatFloat(point.value, 'e', -1, 64)
-				//entry["_timestamp"] = time.Unix(0, point.timestamp).Format("2006-01-02T15:04:05.999999999")
-				//fmt.Println(dpg.metadata)
-				//out = append(out, entry)
-				point.metadata = dpg.metadata
-				out = append(out, point)
+	startTime := query.StartDate.UnixNano()
+	endTime := query.EndDate.UnixNano()
+	for i, point := range out {
+		if point.timestamp > endTime || point.timestamp < startTime {
+			fmt.Println("Dropping", time.Unix(0, point.timestamp), point)
+			if i >= len(out) {
+				out = append(out[:i])
+			} else {
+				out = append(out[:i], out[i+1:]...)
 			}
 		}
 	}
 
 	sort.Sort(out)
-	//fmt.Println(out)
 	return out
 
 }
 
-type ResultSet []*datapoint
-
-func (p ResultSet) Len() int {
-	return len(p)
-}
-
-func (p ResultSet) Less(i, j int) bool {
-	return p[i].timestamp < (p[j].timestamp)
-}
-
-func (p ResultSet) Swap(i, j int) {
-	p[i], p[j] = p[j], p[i]
-}
-
-func (p *datapoint) MarshalJSON() ([]byte, error) {
-	out := make(map[string]string, len(p.metadata)+2)
-	for k, v := range p.metadata {
-		out[k] = v
-	}
-
-	out["_date"] = time.Unix(0, p.timestamp).Format(timeFmt)
-	out["_value"] = strconv.FormatFloat(p.value, 'e', -1, 64)
-	return json.Marshal(out)
-
-}
-
-func (r *Redis) queryBucket(shardKey string, bucket int, filter map[string]string) []*datapointGroup {
-	out := make([]*datapointGroup, 0)
+func (r *Redis) queryBucket(shardKey string, bucket int, filter map[string]string) []*datapoint {
+	out := make([]*datapoint, 0)
 
 	metadataHashes := r.getFilteredMetadataHashes(shardKey, bucket, filter)
 	for hash, metadata := range metadataHashes {
@@ -109,13 +70,13 @@ func (r *Redis) queryBucket(shardKey string, bucket int, filter map[string]strin
 			return out
 		}
 
-		out = append(out, &datapointGroup{r.unpackPoints(rawPoints), metadata, hash})
+		out = append(out, r.unpackPoints(rawPoints, metadata)...)
 	}
 
 	return out
 }
 
-func (r *Redis) unpackPoints(rawPoints []byte) []*datapoint {
+func (r *Redis) unpackPoints(rawPoints []byte, metadata map[string]string) []*datapoint {
 	out := make([]*datapoint, 0, len(rawPoints)/16)
 	buf := bytes.NewBuffer(rawPoints)
 
@@ -127,7 +88,7 @@ func (r *Redis) unpackPoints(rawPoints []byte) []*datapoint {
 		binary.Read(buf, binary.LittleEndian, &timestamp)
 		binary.Read(buf, binary.LittleEndian, &value)
 
-		out = append(out, &datapoint{timestamp, value, nil})
+		out = append(out, &datapoint{timestamp, value, metadata})
 	}
 
 	return out
@@ -143,7 +104,13 @@ RowLoop:
 		hash := int(z.Score)
 
 		metadata := make(map[string]string, 0)
-		err := json.Unmarshal([]byte(z.Member.(string)), &metadata)
+		jsonString := z.Member.(string)
+		parts := strings.SplitN(jsonString, "-", 2)
+		if len(parts) > 1 {
+			jsonString = parts[1]
+		}
+
+		err := json.Unmarshal([]byte(jsonString), &metadata)
 		if err != nil {
 			log.Println("Error unmarshalling json: ", err.Error())
 			continue
@@ -190,4 +157,30 @@ type datapointGroup struct {
 	points       []*datapoint
 	metadata     map[string]string
 	metadataHash int
+}
+
+type ResultSet []*datapoint
+
+func (p ResultSet) Len() int {
+	return len(p)
+}
+
+func (p ResultSet) Less(i, j int) bool {
+	return p[i].timestamp < (p[j].timestamp)
+}
+
+func (p ResultSet) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
+}
+
+func (p *datapoint) MarshalJSON() ([]byte, error) {
+	out := make(map[string]string, len(p.metadata)+2)
+	for k, v := range p.metadata {
+		out[k] = v
+	}
+
+	out["_date"] = time.Unix(0, p.timestamp).UTC().Format(timeFmt)
+	out["_value"] = strconv.FormatFloat(p.value, 'e', -1, 64)
+	return json.Marshal(out)
+
 }

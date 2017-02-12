@@ -41,7 +41,7 @@ type Query struct {
 
 func (q *Query) GetStartDate() *time.Time {
 	if q.StartDate == nil {
-		startDate := time.Now().Add(-1 * time.Hour)
+		startDate := q.GetEndDate().Add(-1 * time.Hour)
 		q.StartDate = &startDate
 	}
 

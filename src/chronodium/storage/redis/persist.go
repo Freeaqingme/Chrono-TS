@@ -67,7 +67,7 @@ func (r *Redis) persistMetric(client *redis.Pipeline, metric storage.Metric) {
 	client.Expire(redisKey, 8*time.Hour)
 
 	redisKey = fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw", SCHEMA_VERSION, metric.Key(), 14400, bucket)
-	client.ZAdd(redisKey, redis.Z{float64(metadataHash), metadata})
+	client.ZAdd(redisKey, redis.Z{float64(metadataHash), fmt.Sprintf("%d-%s", bucket, metadata)})
 	client.Expire(redisKey, 8*time.Hour)
 }
 
