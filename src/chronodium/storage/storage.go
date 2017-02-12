@@ -26,9 +26,33 @@ type Metric interface {
 
 type Repo interface {
 	GetMetricNames() (metricNames []string, err error)
-	Query(*Query)
+	Query(*Query) ResultSet
+}
+
+type ResultSet interface {
 }
 
 type Query struct {
-	ShardKey string
+	ShardKey  string
+	StartDate *time.Time
+	EndDate   *time.Time
+	Filter    map[string]string
+}
+
+func (q *Query) GetStartDate() *time.Time {
+	if q.StartDate == nil {
+		startDate := time.Now().Add(-1 * time.Hour)
+		q.StartDate = &startDate
+	}
+
+	return q.StartDate
+}
+
+func (q *Query) GetEndDate() *time.Time {
+	if q.EndDate == nil {
+		endDate := time.Now()
+		q.EndDate = &endDate
+	}
+
+	return q.EndDate
 }

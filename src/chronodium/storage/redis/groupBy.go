@@ -88,7 +88,7 @@ func newGroupByGroup(groupers []grouper, datapointGroups map[int][]datapointGrou
 }
 
 func showTree(group groupByGroup, depth int) {
-	fmt.Println(depth, strings.Repeat("    ", depth), group.fieldName, "\t", group.fieldValue, "\t", len(group.subGroupBy), group.metadata)
+	fmt.Println(depth, strings.Repeat("    ", depth), group.fieldName, "\t", group.fieldValue, "\t", len(group.subGroupBy), len(group.getDataPoints()), group.metadata)
 	if group.subGroupBy == nil {
 		//for _,pointgroup := range group.datapointGroups {
 		//fmt.Println(pointgroup.metadata)
@@ -177,6 +177,14 @@ func (g *groupByGroup) getDataPointGroups() []datapointGroup {
 		out = append(out, subGroup.getDataPointGroups()...)
 	}
 
+	return out
+}
+
+func (g *groupByGroup) getDataPoints() []*datapoint {
+	out := make([]*datapoint, 0)
+	for _, group := range g.getDataPointGroups() {
+		out = append(out, group.points...)
+	}
 	return out
 }
 

@@ -24,45 +24,76 @@ import (
 	"time"
 
 	"chronodium/storage"
+	"sort"
+	"strconv"
 )
 
 const (
-	AggrSum = iota
+	timeFmt = "2006-01-02T15:04:05.999999999"
 )
 
-func (r *Redis) Query(query *storage.Query) {
-	startTime := time.Now().Add(-24 * time.Hour)
-	endTime := time.Now()
-	filter := map[string]string{
+func (r *Redis) Query(query *storage.Query) storage.ResultSet {
+	//startTime := time.Now().Add(-24 * time.Hour)
+	//endTime := time.Now()
+	/*	filter := map[string]string{
 		"host": "dolf-ThinkPad-T460s",
-	}
-	//groupBy := []string{"__time_300", "instance", "type", "host"}
-	timeGrouper := newGroupByTime(300 * time.Second)
-	groupBy := []grouper{timeGrouper, newGroupByStringer("instance"),
-		newGroupByStringer("type"), newGroupByStringer("host")}
-	//groupBy = []string{ "type"}
-	renderKeys := []string{timeGrouper.Key(), "host", "type", "instance"}
-	//renderKeys := []string{"type", "instance"}
-	//aggr := AggrSum
+		//"instance": "enp0s31f6",
+		//"type": "if_octets",
+	}*/
 
 	datapointGroups := make(map[int][]datapointGroup, 0)
 
-	buckets, _ := r.getBucketsInWindow(startTime, endTime, query.ShardKey)
+	buckets, _ := r.getBucketsInWindow(*query.GetStartDate(), *query.GetEndDate(), query.ShardKey)
 	for _, bucket := range buckets {
-		groups := r.queryBucket(query.ShardKey, bucket, filter)
+		groups := r.queryBucket(query.ShardKey, bucket, query.Filter)
 		for _, group := range groups {
 			datapointGroups[group.metadataHash] = append(datapointGroups[group.metadataHash], *group)
 		}
 	}
-	grouped := newGroupByGroup(groupBy, datapointGroups)
 
-	fmt.Println("Group By Tree, group by:", groupBy)
-	showTree(grouped, 0)
-	fmt.Println("")
-	//keys := make(map[string]struct{},0)
-	//fields := make(map[string]string)
-	//buildResultSet(grouped, fields, keys, 0)
-	grouped.BuildResultSet(renderKeys, groupBy)
+	out := make(ResultSet, 0)
+	for _, dpgs := range datapointGroups {
+		for _, dpg := range dpgs {
+			for _, point := range dpg.points {
+				//entry["_value"] = strconv.FormatFloat(point.value, 'e', -1, 64)
+				//entry["_timestamp"] = time.Unix(0, point.timestamp).Format("2006-01-02T15:04:05.999999999")
+				//fmt.Println(dpg.metadata)
+				//out = append(out, entry)
+				point.metadata = dpg.metadata
+				out = append(out, point)
+			}
+		}
+	}
+
+	sort.Sort(out)
+	//fmt.Println(out)
+	return out
+
+}
+
+type ResultSet []*datapoint
+
+func (p ResultSet) Len() int {
+	return len(p)
+}
+
+func (p ResultSet) Less(i, j int) bool {
+	return p[i].timestamp < (p[j].timestamp)
+}
+
+func (p ResultSet) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
+}
+
+func (p *datapoint) MarshalJSON() ([]byte, error) {
+	out := make(map[string]string, len(p.metadata)+2)
+	for k, v := range p.metadata {
+		out[k] = v
+	}
+
+	out["_date"] = time.Unix(0, p.timestamp).Format(timeFmt)
+	out["_value"] = strconv.FormatFloat(p.value, 'e', -1, 64)
+	return json.Marshal(out)
 
 }
 
@@ -96,7 +127,7 @@ func (r *Redis) unpackPoints(rawPoints []byte) []*datapoint {
 		binary.Read(buf, binary.LittleEndian, &timestamp)
 		binary.Read(buf, binary.LittleEndian, &value)
 
-		out = append(out, &datapoint{timestamp, value})
+		out = append(out, &datapoint{timestamp, value, nil})
 	}
 
 	return out
@@ -152,6 +183,7 @@ func (r *Redis) GetMetricNames() (metricNames []string, err error) {
 type datapoint struct {
 	timestamp int64
 	value     float64
+	metadata  map[string]string
 }
 
 type datapointGroup struct {

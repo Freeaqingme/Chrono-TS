@@ -18,8 +18,11 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"chronodium/storage"
+	"chronodium/storage/redis"
+	"strings"
 )
 
 type httpServer struct {
@@ -39,7 +42,7 @@ func Start(repo storage.Repo) {
 }
 
 func (s *httpServer) queryHandler(w http.ResponseWriter, r *http.Request) {
-	query := &storage.Query{}
+	query := &storage.Query{Filter: make(map[string]string, 0)}
 	query.ShardKey = r.URL.Query().Get("pk")
 	if query.ShardKey == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -47,7 +50,54 @@ func (s *httpServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.repo.Query(query)
+	//var err error
+	if startDate := r.URL.Query().Get("start-date"); startDate != "" {
+		startDate, err := time.Parse("2006-01-02T15:04:05", startDate)
+		query.StartDate = &startDate
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Could not parse start-date: " + err.Error()))
+			return
+		}
+	}
+
+	if endDate := r.URL.Query().Get("end-date"); endDate != "" {
+		endDate, err := time.Parse("2006-01-02T15:04:05",
+			endDate)
+		query.EndDate = &endDate
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Could not parse end-date: " + err.Error()))
+			return
+		}
+	}
+
+	if filters, exists := r.URL.Query()["filter"]; exists {
+		for _, filterString := range filters {
+			parts := strings.Split(filterString, ":")
+			if len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte("Invalid filter specified: " + filterString))
+				return
+			}
+
+			if _, exists := query.Filter[parts[0]]; exists {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte("Cannot use same filter key more than once: " + parts[0]))
+				return
+			}
+
+			query.Filter[parts[0]] = parts[1]
+		}
+	}
+
+	res := s.repo.Query(query).(redis.ResultSet)
+
+	_ = json.NewEncoder(w).Encode(
+		struct {
+			Results redis.ResultSet `json:"results"`
+		}{Results: res},
+	)
 }
 
 func (s *httpServer) graphiteHandler(w http.ResponseWriter, r *http.Request) {
