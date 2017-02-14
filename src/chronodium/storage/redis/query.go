@@ -29,10 +29,6 @@ import (
 	"chronodium/storage"
 )
 
-const (
-	timeFmt = "2006-01-02T15:04:05.999999999"
-)
-
 func (r *Redis) Query(query *storage.Query) storage.ResultSet {
 	buckets, _ := r.getBucketsInWindow(*query.GetStartDate(), *query.GetEndDate(), query.ShardKey)
 	out := make(ResultSet, 0)
@@ -63,7 +59,7 @@ func (r *Redis) queryBucket(shardKey string, bucket int, filter map[string]strin
 
 	metadataHashes := r.getFilteredMetadataHashes(shardKey, bucket, filter)
 	for hash, metadata := range metadataHashes {
-		redisKey := fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw-%d", SCHEMA_VERSION, shardKey, 14400, bucket, hash)
+		redisKey := fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw-%d", SCHEMA_VERSION, shardKey, bucketWindow, bucket, hash)
 		rawPoints, err := r.client.Get(redisKey).Bytes()
 		if err != nil {
 			log.Println("Error from Redis: ", err.Error())
@@ -95,7 +91,7 @@ func (r *Redis) unpackPoints(rawPoints []byte, metadata map[string]string) []*da
 }
 
 func (r *Redis) getFilteredMetadataHashes(shardKey string, bucket int, filter map[string]string) map[int]map[string]string {
-	redisKey := fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw", SCHEMA_VERSION, shardKey, 14400, bucket)
+	redisKey := fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw", SCHEMA_VERSION, shardKey, bucketWindow, bucket)
 	res, _ := r.client.ZRangeWithScores(redisKey, 0, -1).Result()
 
 	metadataHashes := make(map[int]map[string]string, 0)
@@ -137,7 +133,7 @@ func (r *Redis) getBucketsInWindow(startTime, endTime time.Time, shardKey string
 
 	for !startTime.After(endTime) {
 		buckets = append(buckets, r.getBucket(shardKey, &startTime))
-		startTime = startTime.Add(14400 * time.Second)
+		startTime = startTime.Add(bucketWindow * time.Second)
 	}
 
 	return buckets, nil
@@ -179,8 +175,8 @@ func (p *datapoint) MarshalJSON() ([]byte, error) {
 		out[k] = v
 	}
 
-	out["_date"] = time.Unix(0, p.timestamp).UTC().Format(timeFmt)
-	out["_value"] = strconv.FormatFloat(p.value, 'e', -1, 64)
+	out["_date"] = time.Unix(0, p.timestamp).UTC().Format(time.RFC3339Nano)
+	out["_value"] = strconv.FormatFloat(p.value, 'f', -1, 64)
 	return json.Marshal(out)
 
 }

@@ -18,11 +18,11 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"chronodium/storage"
 	"chronodium/storage/redis"
-	"strings"
 )
 
 type httpServer struct {
@@ -93,7 +93,7 @@ func (s *httpServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 
 	res := s.repo.Query(query).(redis.ResultSet)
 
-	_ = json.NewEncoder(w).Encode(
+	json.NewEncoder(w).Encode(
 		struct {
 			Results redis.ResultSet `json:"results"`
 		}{Results: res},

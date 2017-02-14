@@ -30,6 +30,8 @@ import (
 
 const SCHEMA_VERSION = 1
 
+const bucketWindow = 14400
+
 func (r *Redis) persistMetrics(metrics <-chan storage.Metric) {
 	ticker := time.NewTicker(1 * time.Second)
 
@@ -48,7 +50,7 @@ func (r *Redis) persistMetrics(metrics <-chan storage.Metric) {
 
 func (r *Redis) getBucket(shardKey string, timestamp *time.Time) int {
 	keyHash := int(murmur3.Sum32([]byte(shardKey)))
-	return int((timestamp.Unix()-int64(keyHash>>16))/14400) * 14400
+	return int((timestamp.Unix()-int64(keyHash>>16))/bucketWindow) * bucketWindow
 }
 
 func (r *Redis) persistMetric(client *redis.Pipeline, metric storage.Metric) {
@@ -58,7 +60,7 @@ func (r *Redis) persistMetric(client *redis.Pipeline, metric storage.Metric) {
 	metadata := orderableMap(metric.Metadata()).ToJson()
 	metadataHash := murmur3.Sum32(metadata)
 
-	redisKey := fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw-%d", SCHEMA_VERSION, metric.Key(), 14400, bucket, metadataHash)
+	redisKey := fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw-%d", SCHEMA_VERSION, metric.Key(), bucketWindow, bucket, metadataHash)
 
 	buf := make([]byte, 16)
 	conversion.Int64ToBinary(buf[0:8], metric.Time().UnixNano())
@@ -66,7 +68,7 @@ func (r *Redis) persistMetric(client *redis.Pipeline, metric storage.Metric) {
 	client.Append(redisKey, string(buf))
 	client.Expire(redisKey, 8*time.Hour)
 
-	redisKey = fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw", SCHEMA_VERSION, metric.Key(), 14400, bucket)
+	redisKey = fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw", SCHEMA_VERSION, metric.Key(), bucketWindow, bucket)
 	client.ZAdd(redisKey, redis.Z{float64(metadataHash), fmt.Sprintf("%d-%s", bucket, metadata)})
 	client.Expire(redisKey, 8*time.Hour)
 }
