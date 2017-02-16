@@ -30,22 +30,18 @@ import (
 )
 
 func (r *Redis) Query(query *storage.Query) storage.ResultSet {
-	buckets, _ := r.getBucketsInWindow(*query.GetStartDate(), *query.GetEndDate(), query.ShardKey)
-	out := make(ResultSet, 0)
+	buckets, _ := r.getBucketsInWindow(query.GetStartDate(), query.GetEndDate(), query.ShardKey)
+	entries := make(ResultSet, 0)
 	for _, bucket := range buckets {
-		out = append(out, r.queryBucket(query.ShardKey, bucket, query.Filter)...)
+		entries = append(entries, r.queryBucket(query.ShardKey, bucket, query.Filter)...)
 	}
 
 	startTime := query.StartDate.UnixNano()
 	endTime := query.EndDate.UnixNano()
-	for i, point := range out {
-		if point.timestamp > endTime || point.timestamp < startTime {
-			fmt.Println("Dropping", time.Unix(0, point.timestamp), point)
-			if i >= len(out) {
-				out = append(out[:i])
-			} else {
-				out = append(out[:i], out[i+1:]...)
-			}
+	out := make(ResultSet, 0)
+	for _, point := range entries {
+		if point.timestamp > startTime && point.timestamp < endTime {
+			out = append(out, point)
 		}
 	}
 
@@ -135,6 +131,8 @@ func (r *Redis) getBucketsInWindow(startTime, endTime time.Time, shardKey string
 		buckets = append(buckets, r.getBucket(shardKey, &startTime))
 		startTime = startTime.Add(bucketWindow * time.Second)
 	}
+
+	buckets = append(buckets, r.getBucket(shardKey, &startTime))
 
 	return buckets, nil
 }

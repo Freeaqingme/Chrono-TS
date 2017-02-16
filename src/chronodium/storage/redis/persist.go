@@ -66,11 +66,11 @@ func (r *Redis) persistMetric(client *redis.Pipeline, metric storage.Metric) {
 	conversion.Int64ToBinary(buf[0:8], metric.Time().UnixNano())
 	conversion.Float64ToBinary(buf[8:16], metric.Value())
 	client.Append(redisKey, string(buf))
-	client.Expire(redisKey, 8*time.Hour)
+	client.Expire(redisKey, 25*time.Hour)
 
 	redisKey = fmt.Sprintf("chronodium-%d-{metric-%s}-%d-%d-raw", SCHEMA_VERSION, metric.Key(), bucketWindow, bucket)
 	client.ZAdd(redisKey, redis.Z{float64(metadataHash), fmt.Sprintf("%d-%s", bucket, metadata)})
-	client.Expire(redisKey, 8*time.Hour)
+	client.Expire(redisKey, 25*time.Hour)
 }
 
 type orderableMap map[string]string

@@ -17,7 +17,9 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -42,7 +44,7 @@ func Start(repo storage.Repo) {
 }
 
 func (s *httpServer) queryHandler(w http.ResponseWriter, r *http.Request) {
-	query := &storage.Query{Filter: make(map[string]string, 0)}
+	query := &storage.Query{Filter: make(map[string]string, 0), EndDate: time.Now(), StartDate: time.Now().Add(-1 * time.Hour)}
 	query.ShardKey = r.URL.Query().Get("pk")
 	if query.ShardKey == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -52,8 +54,8 @@ func (s *httpServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 
 	//var err error
 	if startDate := r.URL.Query().Get("start-date"); startDate != "" {
-		startDate, err := time.Parse("2006-01-02T15:04:05", startDate)
-		query.StartDate = &startDate
+		startDate, err := s.getTimeFromInput(startDate)
+		query.StartDate = startDate
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("Could not parse start-date: " + err.Error()))
@@ -62,9 +64,8 @@ func (s *httpServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if endDate := r.URL.Query().Get("end-date"); endDate != "" {
-		endDate, err := time.Parse("2006-01-02T15:04:05",
-			endDate)
-		query.EndDate = &endDate
+		endDate, err := s.getTimeFromInput(endDate)
+		query.EndDate = endDate
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("Could not parse end-date: " + err.Error()))
@@ -98,6 +99,22 @@ func (s *httpServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 			Results redis.ResultSet `json:"results"`
 		}{Results: res},
 	)
+}
+
+func (s *httpServer) getTimeFromInput(timeString string) (time.Time, error) {
+	out, err := time.Parse(time.RFC3339, timeString)
+	if err == nil {
+		return out, nil
+	}
+
+	var timeInt int64
+	timeInt, err = strconv.ParseInt(timeString, 10, 64)
+	if err != nil {
+		return out, err
+	}
+
+	return time.Unix(timeInt, 0), nil
+
 }
 
 func (s *httpServer) graphiteHandler(w http.ResponseWriter, r *http.Request) {

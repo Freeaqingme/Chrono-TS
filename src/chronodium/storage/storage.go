@@ -34,25 +34,15 @@ type ResultSet interface {
 
 type Query struct {
 	ShardKey  string
-	StartDate *time.Time
-	EndDate   *time.Time
+	StartDate time.Time
+	EndDate   time.Time
 	Filter    map[string]string
 }
 
-func (q *Query) GetStartDate() *time.Time {
-	if q.StartDate == nil {
-		startDate := q.GetEndDate().Add(-1 * time.Hour)
-		q.StartDate = &startDate
-	}
-
+func (q *Query) GetStartDate() time.Time {
 	return q.StartDate
 }
 
-func (q *Query) GetEndDate() *time.Time {
-	if q.EndDate == nil {
-		endDate := time.Now()
-		q.EndDate = &endDate
-	}
-
+func (q *Query) GetEndDate() time.Time {
 	return q.EndDate
 }
