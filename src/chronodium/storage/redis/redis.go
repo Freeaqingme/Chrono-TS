@@ -36,7 +36,11 @@ type Metric interface {
 	Time() time.Time
 }
 
-type Config struct{}
+type Config struct{
+	ClientType string `gcfg:"client-type"` // must be one of 'standalone' or 'cluster'
+	Address  []string
+	Password string
+}
 
 type Redis struct {
 	config   *Config
@@ -48,12 +52,25 @@ type Redis struct {
 }
 
 func NewRedis(config *Config, stopper *stop.Stopper, tierSets []*tier.TierSet) *Redis {
+	switch config.ClientType {
+		case "", "standalone":
+			if len(config.Address) > 1 {
+				panic("Can only specify a single redis address when running in standalone mode")
+			}
+
+			if len(config.Address) == 0 {
+				config.Address = []string{"localhost:6379"}
+			}
+		case "cluster":
+			break
+		default:
+			panic("Invalid client type specified, must be one of 'standalone' or 'cluster'")
+	}
 	out := &Redis{
 		config:   config,
 		stopper:  stopper,
 		tierSets: tierSets,
-
-		sources: make(map[string]<-chan storage.Metric, 0),
+		sources:  make(map[string]<-chan storage.Metric, 0),
 	}
 
 	out.client = out.getNewClient()
@@ -78,8 +95,16 @@ func (r *Redis) Start() {
 }
 
 func (r *Redis) getNewClient() redis.Cmdable {
+	if r.config.ClientType == "cluster" {
+		return redis.NewClusterClient(&redis.ClusterOptions{
+			Addrs:     r.config.Address,
+			Password: "", // no password set
+		})
+
+	}
+
 	return redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     r.config.Address[0],
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})

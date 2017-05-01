@@ -25,3 +25,11 @@ match = ".*"
 tier  = seconds
 tier  = minutes
 tier  = days
+
+[redis]
+
+# Must be one of 'cluster' or 'standalone'
+client-type = cluster
+
+address = 127.0.0.1:6379
+address = 127.0.0.1:6379
