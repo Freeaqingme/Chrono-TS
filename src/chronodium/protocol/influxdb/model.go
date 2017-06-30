@@ -40,9 +40,9 @@ func (m *metric) Time() time.Time {
 func (m *metric) Key() string {
 	if m.key == "" {
 		if vhost, exists := m.Metadata()["vhost"]; exists {
-			m.key = vhost + "__" + m.point.Name()
+			m.key = vhost + "__" + string(m.point.Name())
 		} else {
-			m.key = m.Metadata()["host"] + "__" + m.point.Name()
+			m.key = m.Metadata()["host"] + "__" + string(m.point.Name())
 		}
 	}
 
@@ -52,7 +52,7 @@ func (m *metric) Key() string {
 func (m *metric) Metadata() map[string]string {
 	if m.tags == nil {
 		m.tags = make(map[string]string, len(m.point.Tags())+1)
-		m.tags["_key"] = m.point.Name()
+		m.tags["_key"] = string(m.point.Name())
 		for _, tag := range m.point.Tags() {
 			m.tags[string(tag.Key)] = string(tag.Value)
 		}
