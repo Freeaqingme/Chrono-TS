@@ -1,0 +1,11 @@
+[Unit]
+Description=Keeping Time in Series
+After=nss-lookup.target
+
+[Service]
+Restart=always
+RestartSec=30
+EnvironmentFile=/etc/default/chronodium
+ExecStartPre=-/bin/mkdir -p /var/run/chronodium/
+ExecStart=/usr/bin/chronodium --config /etc/chronodium/chronodium.conf daemon start
+LimitNOFILE=65635

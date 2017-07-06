@@ -5,3 +5,4 @@ bin/*
 pkg/*
 !src/MonGoTS/*
 sladu.conf
+pkg_root

@@ -1,0 +1,14 @@
+/var/log/chronodium.log
+{
+	rotate 7
+	missingok
+	notifempty
+	compress
+	delaycompress
+
+	create 0644 root root
+	sharedscripts
+	postrotate
+		/bin/systemctl kill -s HUP chronodium.service
+	endscript
+}

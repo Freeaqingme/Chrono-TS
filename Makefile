@@ -45,3 +45,40 @@ clean:
 .PHONY: test
 test:
 	go test -tags '$(BUILDTAGS)' -ldflags '$(LDFLAGS)' chronodium/...
+
+
+.PHONY: deb
+deb: release
+	rm -rf pkg_root/
+	mkdir -p pkg_root/lib/systemd/system/
+	cp dist/chronodium.service pkg_root/lib/systemd/system/chronodium.service
+	mkdir -p pkg_root/etc/default
+	cp dist/debian/defaults pkg_root/etc/default/chronodium
+	mkdir -p pkg_root/usr/bin/
+	cp bin/chronodium pkg_root/usr/bin/chronodium
+	mkdir -p pkg_root/usr/share/doc/chronodium
+	cp LICENSE pkg_root/usr/share/doc/chronodium/
+	mkdir -p pkg_root/etc/chronodium
+	cp chronodium.conf.dist pkg_root/etc/chronodium/chronodium.conf
+	mkdir -p pkg_root/etc/logrotate.d
+	cp dist/debian/logrotate pkg_root/etc/logrotate.d/chronodium
+	fpm \
+		-n chronodium \
+		-C pkg_root \
+		-s dir \
+		-t deb \
+		-v $(VERSION) \
+		--force \
+		--deb-compression bzip2 \
+		--after-install dist/debian/postinst \
+		--before-remove dist/debian/prerm \
+		--license Apache-2 \
+		-m "Dolf Schimmel <dolf@transip.nl>" \
+		--url "https://github.com/Freeaqingme/Chrono-TS" \
+		--vendor "github.com/Freeaqingme" \
+		--description "Keeping time in Series" \
+		--category network \
+		--config-files /etc/chronodium/chronodium.conf \
+		--directories /var/run/chronodium \
+		.
+
